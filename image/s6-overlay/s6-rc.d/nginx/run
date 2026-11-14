@@ -1,0 +1,6 @@
+#!/command/with-contenv sh
+# WHAT: nginx in the foreground, so the process s6 supervises is the master.
+# WHY `daemon off`: with the stock daemonizing start the supervised pid is a
+# dead parent, and every SIGHUP (s6-svc -h, which is what a decoy reload sends)
+# would be delivered to a process that no longer exists.
+exec nginx -g 'daemon off;'

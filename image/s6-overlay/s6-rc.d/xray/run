@@ -1,0 +1,11 @@
+#!/command/with-contenv sh
+# WHAT: Xray, holding back until the reconciler has written the first config.
+# WHY with-contenv: s6-rc longruns get a minimal environment, so without it the
+# image's XRAY_LOCATION_ASSET never arrives and every config naming `geoip:` /
+# `geosite:` dies on "failed to open geoip.dat" (the plane's geo-block preset
+# renders exactly that).
+# WHY the wait: `xray run -config <missing>` exits immediately, and s6 restarts
+# a dead longrun at once -- a fresh node would spin (and log) for as long as
+# enrollment takes. The file appearing is the start signal.
+while [ ! -f /var/lib/lessv/config.json ]; do sleep 5; done
+exec /usr/local/bin/xray run -config /var/lib/lessv/config.json

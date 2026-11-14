@@ -1,0 +1,52 @@
+# WHAT: the deployment descriptor for one LessV node.
+# WHY one service: a node is one identity (one token, one applied hash) and one
+# 443, and the agent restarts Xray and reloads nginx after every apply. Compose
+# here is the runtime contract -- restart policy, ulimits, stop grace, volumes --
+# not a multi-container topology.
+#
+# Enrolling is deliberately not a service; run it once, into the same volume:
+#   docker run --rm -it -v lessv-etc:/etc/lessv \
+#     --entrypoint /usr/local/bin/lessv-node ghcr.io/realumino/lessv-node:latest \
+#     enroll --cp https://cp.example.org --node tokyo01 \
+#     --restart-mode s6 --nginx-conf-path /etc/nginx/http.d/lessv-decoy.conf
+# (the node token is read from stdin)
+services:
+  lessv-node:
+    image: ghcr.io/realumino/lessv-node:latest
+    container_name: lessv-node
+    restart: unless-stopped
+
+    # Host networking keeps the client's real source address: Xray and the
+    # decoy see the peer, `detected_ip` at enroll is the host's, and there is
+    # no extra NAT hop on 443. With bridge networking you would publish 80/443
+    # instead, and every source address would read as the docker gateway.
+    network_mode: host
+
+    volumes:
+      # identity: node.toml (token, 0600) and the certificate tree. Losing this
+      # volume means re-enrolling the node.
+      - lessv-etc:/etc/lessv
+      # state: applied hash, the live Xray config, geodata, last-good snapshot.
+      - lessv-state:/var/lib/lessv
+
+    # An apply can hold the reconciler for `xray -test` (15 s) plus verification
+    # (3 s); the grace period must outlast the worst case, and outlast
+    # lessv-node's own timeout-kill (60 s).
+    stop_grace_period: 90s
+
+    # Matches LimitNOFILE= in the systemd units and rc_ulimit in the OpenRC ones.
+    ulimits:
+      nofile: 1000000
+
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  # Explicit names, so the one-off enroll command in the README (and in the
+  # service's log line) can mount `lessv-etc` by the same name compose uses.
+  # Without `name:`, compose would create `lessv-node_lessv-etc` and enroll
+  # into a volume the node never sees.
+  lessv-etc:
+    name: lessv-etc
+  lessv-state:
+    name: lessv-state

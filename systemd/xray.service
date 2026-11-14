@@ -1,0 +1,24 @@
+[Unit]
+Description=Xray Service (managed by lessv-node)
+Documentation=https://gitee.com/realumino/lessv
+# The decoy origin is a Unix socket created by nginx; REALITY relays every
+# handshake to it, so nginx must be up before Xray starts accepting.
+After=network-online.target nss-lookup.target nginx.service
+Wants=network-online.target nginx.service
+
+[Service]
+Type=simple
+# lessv-node writes the config 0600 as root; the service therefore runs as
+# root instead of the upstream `nobody` user, which could not read it.
+User=root
+Group=root
+# GeoIP/GeoSite data managed by lessv-node (routing rules name geoip:/geosite:).
+Environment=XRAY_LOCATION_ASSET=/var/lib/lessv/assets
+ExecStart=/usr/local/bin/xray run -config /var/lib/lessv/config.json
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=1000000
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,230 @@
+# WHAT: build, verify, and publish the lessv-node image.
+#
+# WHY native runners per architecture: the release build is opt-level=z + LTO +
+# codegen-units=1; building arm64 under QEMU on an amd64 runner costs an hour
+# for nothing. `ubuntu-24.04-arm` is a native arm64 runner and is free for
+# public repositories -- this repository is public.
+#
+# WHY push-by-digest: each architecture is built on its own runner, so the
+# multi-arch index is assembled afterwards from the two digests rather than
+# from two QEMU builds in one `buildx` call.
+name: image
+
+on:
+  push:
+    branches: [main]
+    tags: ["node-v*"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: image-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  # The crate's own baseline. Runs before anything is published.
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: s6 run scripts import the container environment
+        # WHY: s6-rc longruns get a minimal environment, not the image's ENV. A
+        # `#!/bin/sh` run script silently loses XRAY_LOCATION_ASSET, and the
+        # supervised Xray then cannot find geoip.dat (any `geoip:` rule fails to
+        # load). `with-contenv` is what carries the image ENV into the service.
+        run: |
+          set -eu
+          for script in image/s6-overlay/s6-rc.d/*/run image/s6-overlay/s6-rc.d/*/finish; do
+            [ -e "$script" ] || continue
+            head -n 1 "$script" | grep -qx '#!/command/with-contenv sh' \
+              || { echo "$script must start with #!/command/with-contenv sh" >&2; exit 1; }
+          done
+      - name: Install the musl toolchain
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq musl-tools
+          rustup target add x86_64-unknown-linux-musl
+      - run: cargo test --locked
+      - run: cargo build --locked --release --target x86_64-unknown-linux-musl
+
+  # One source of truth for the version and the tag list, checked against the
+  # tag actually pushed.
+  meta:
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      xray_version: ${{ steps.version.outputs.xray_version }}
+      image: ${{ steps.version.outputs.image }}
+      publishing: ${{ steps.version.outputs.publishing }}
+      tags: ${{ steps.version.outputs.tags }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: version
+        run: |
+          set -eu
+          version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n 1)
+          [ -n "$version" ] || { echo "cannot read the version from Cargo.toml" >&2; exit 1; }
+          xray_version=$(sed -n 's/^ARG XRAY_VERSION=\(.*\)$/\1/p' Dockerfile | head -n 1)
+          [ -n "$xray_version" ] || { echo "cannot read ARG XRAY_VERSION from the Dockerfile" >&2; exit 1; }
+          # GHCR requires a lowercase path: realumino/LessV-Node -> lessv-node.
+          image="ghcr.io/${GITHUB_REPOSITORY,,}"
+
+          publishing=false
+          tags=""
+          case "$GITHUB_REF" in
+            refs/tags/node-v*)
+              tag_version="${GITHUB_REF#refs/tags/node-v}"
+              if [ "$tag_version" != "$version" ]; then
+                echo "tag node-v$tag_version disagrees with Cargo.toml ($version)" >&2
+                exit 1
+              fi
+              publishing=true
+              short="${GITHUB_SHA::7}"
+              tags="$image:$version
+          $image:latest
+          $image:sha-$short"
+              ;;
+          esac
+
+          {
+            echo "version=$version"
+            echo "xray_version=$xray_version"
+            echo "image=$image"
+            echo "publishing=$publishing"
+            echo "tags<<EOF"
+            echo "$tags"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo "### lessv-node image"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| version | \`$version\` |"
+            echo "| Xray | \`$xray_version\` |"
+            echo "| publishing | \`$publishing\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  build:
+    needs: [test, meta]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GHCR
+        if: needs.meta.outputs.publishing == 'true'
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Branch and pull-request builds are thrown away: they exist so Dockerfile
+      # rot fails here instead of on a tag.
+      - name: Build (verify only)
+        if: needs.meta.outputs.publishing != 'true'
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/${{ matrix.arch }}
+          build-args: VERSION=${{ needs.meta.outputs.version }}
+          cache-from: type=gha,scope=${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.arch }}
+
+      - name: Build and push by digest
+        id: push
+        if: needs.meta.outputs.publishing == 'true'
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/${{ matrix.arch }}
+          build-args: VERSION=${{ needs.meta.outputs.version }}
+          cache-from: type=gha,scope=${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.arch }}
+          outputs: type=image,name=${{ needs.meta.outputs.image }},push-by-digest=true,name-canonical=true,push=true
+          provenance: mode=max
+
+      - name: Hand the digest to the merge job
+        if: needs.meta.outputs.publishing == 'true'
+        run: |
+          mkdir -p /tmp/digests
+          digest="${{ steps.push.outputs.digest }}"
+          [ -n "$digest" ] || { echo "no digest was produced" >&2; exit 1; }
+          touch "/tmp/digests/${digest#sha256:}"
+
+      - uses: actions/upload-artifact@v7
+        if: needs.meta.outputs.publishing == 'true'
+        with:
+          name: digests-${{ matrix.arch }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  # Assemble one index from the two digests and prove both platforms are in it.
+  merge:
+    needs: [meta, build]
+    if: needs.meta.outputs.publishing == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: /tmp/digests
+          pattern: digests-*
+          merge-multiple: true
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create the multi-arch index
+        env:
+          IMAGE: ${{ needs.meta.outputs.image }}
+          TAGS: ${{ needs.meta.outputs.tags }}
+        run: |
+          set -eu
+          shopt -s nullglob
+          digests=(/tmp/digests/*)
+          if [ ${#digests[@]} -ne 2 ]; then
+            echo "expected two digests, found ${#digests[@]} in /tmp/digests" >&2
+            exit 1
+          fi
+          args=()
+          for digest in "${digests[@]}"; do
+            args+=("${IMAGE}@sha256:$(basename "$digest")")
+          done
+          first=""
+          while read -r tag; do
+            [ -n "$tag" ] || continue
+            args+=(--tag "$tag")
+            [ -n "$first" ] || first="$tag"
+          done <<< "$TAGS"
+          echo "merging ${#digests[@]} digests into $first and friends"
+          docker buildx imagetools create "${args[@]}"
+
+          # The index must really carry both architectures; a merge that
+          # silently dropped one would only be noticed by an operator on an
+          # arm64 host pulling the tag.
+          raw=$(docker buildx imagetools inspect --raw "$first")
+          for arch in amd64 arm64; do
+            if ! echo "$raw" | grep -qE "\"architecture\": *\"$arch\""; then
+              echo "the published index has no linux/$arch manifest" >&2
+              exit 1
+            fi
+          done
+          echo "published $first with amd64 and arm64"

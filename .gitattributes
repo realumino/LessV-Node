@@ -1,0 +1,7 @@
+# WHAT: check every text file out with LF endings, on every platform.
+# WHY: the product is shell scripts, unit files, and a Dockerfile. A CRLF
+# `#!/command/with-contenv sh` is an unknown interpreter inside the image, and a
+# CRLF `#!/bin/sh` breaks `install.sh` and the OpenRC init scripts on the host.
+# Git normalises on commit either way; this also fixes the working tree, which
+# is what `docker build` and the release tarball copy from.
+* text=auto eol=lf

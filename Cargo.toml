@@ -1,0 +1,25 @@
+[package]
+name = "lessv-node"
+version = "0.6.0"
+edition = "2021"
+rust-version = "1.80"
+description = "LessV node reconciler: pulls Xray config and certificates from the control plane"
+license = "AGPL-3.0-or-later"
+
+# One static binary, no runtime dependencies. TLS is rustls (pure Rust plus
+# ring's small C core); musl builds link statically so the artifact runs on
+# glibc and musl distributions alike.
+[dependencies]
+libc = "0.2"
+miniz_oxide = "0.8"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+ureq = { version = "3", default-features = false, features = ["rustls"] }
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

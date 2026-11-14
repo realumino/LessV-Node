@@ -1,0 +1,9 @@
+.git/
+.gitignore
+.plans/
+target/
+dist/
+Dockerfile
+compose.yaml
+README.md
+HANDOFF.md
