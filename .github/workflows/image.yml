@@ -13,7 +13,7 @@ name: image
 on:
   push:
     branches: [main]
-    tags: ["node-v*"]
+    tags: ["vela-server-v*"]
   pull_request:
   workflow_dispatch:
 
@@ -76,10 +76,10 @@ jobs:
           publishing=false
           tags=""
           case "$GITHUB_REF" in
-            refs/tags/node-v*)
-              tag_version="${GITHUB_REF#refs/tags/node-v}"
+            refs/tags/vela-server-v*)
+              tag_version="${GITHUB_REF#refs/tags/vela-server-v}"
               if [ "$tag_version" != "$version" ]; then
-                echo "tag node-v$tag_version disagrees with Cargo.toml ($version)" >&2
+                echo "tag vela-server-v$tag_version disagrees with Cargo.toml ($version)" >&2
                 exit 1
               fi
               publishing=true

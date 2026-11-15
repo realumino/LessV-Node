@@ -52,7 +52,7 @@ component that parses remote-supplied configuration.
 | Token input | stdin only — never argv, never the environment |
 
 `<version>` is the crate version (`Cargo.toml`), and `vela-server version` run
-from the image prints it; the release workflow refuses a `node-v*` tag that
+from the image prints it; the release workflow refuses a `vela-server-v*` tag that
 disagrees.
 
 ---
@@ -225,7 +225,8 @@ The build asserts, and fails rather than shipping a broken node:
 
 - every push to `main` and every PR builds (no publish) so Dockerfile rot is
   caught early;
-- pushing a `node-v<version>` tag tests, verifies the tag against `Cargo.toml`
+- pushing a `vela-server-v<version>` tag tests, verifies the tag against
+  `Cargo.toml`
   and the Dockerfile's `XRAY_VERSION`, builds each architecture on its own
   native runner (`ubuntu-24.04`, `ubuntu-24.04-arm`), and merges the two
   digests into one index with tags `<version>`, `latest`, `sha-<short>`;
