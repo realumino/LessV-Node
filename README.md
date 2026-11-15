@@ -70,7 +70,6 @@ docker run --rm -it \
   --entrypoint /usr/local/bin/vela-server \
   ghcr.io/realumino/vela-server:latest \
   enroll --cp https://cp.example.org --node tokyo01 \
-         --restart-mode s6 \
          --nginx-conf-path /etc/nginx/http.d/vela-decoy.conf
 ```
 
@@ -78,9 +77,9 @@ The token is read from stdin (hidden when stdin is a TTY). `node.toml` is
 written before the plane is contacted, so a failed enroll still leaves a
 complete file: fix the plane and run enroll again, or just start the container.
 
-`--restart-mode s6` and `--nginx-conf-path` are mandatory in the image. The
-default nginx directory is Debian's `/etc/nginx/conf.d`, which Alpine does not
-use.
+`--nginx-conf-path` is mandatory in the image. The default nginx directory is
+Debian's `/etc/nginx/conf.d`, which Alpine does not use. Supervision is always
+s6: there is no init system to choose.
 
 ### 2. Start it
 

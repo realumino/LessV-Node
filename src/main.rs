@@ -2,9 +2,8 @@
 //!
 //! WHAT: `enroll` writes `/etc/vela/node.toml` and first-contacts the plane;
 //! `run` is the daemon that converges Xray, certificates, and nginx.
-//! WHY one static binary: no interpreter, no site-packages, no virtualenv —
-//! the same executable runs on glibc and musl distributions (Debian, Alpine)
-//! under systemd or OpenRC.
+//! WHY one static binary: no interpreter, no site-packages, no virtualenv.
+//! It is built into the image, where s6 owns the three processes.
 
 mod apply;
 mod certs;
