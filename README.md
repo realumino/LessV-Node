@@ -254,6 +254,13 @@ One manual step after the very first publish: GitHub creates the GHCR package as
 **private**. Flip it to public once in the package settings (Package settings →
 Change visibility).
 
+### Testing before a release
+
+`docs/testing.md` describes every environment this code is exercised in — the
+hermetic crate tests, the image build assertions, the stub plane, a real plane
+via `wrangler dev`, and a throwaway host with real ports — plus what each one
+cannot prove and the failure policy.
+
 ### The bare-metal tarball
 
 ```sh
