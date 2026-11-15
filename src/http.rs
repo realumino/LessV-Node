@@ -98,7 +98,7 @@ impl NodeClient {
             .map(|value| serde_json::to_vec(value).unwrap_or_default())
             .unwrap_or_default();
         let headers: Vec<(&str, String)> = std::iter::once(("Authorization", format!("Bearer {}", self.token)))
-            .chain(std::iter::once(("X-Lessv-Node", self.node_id.clone())))
+            .chain(std::iter::once(("X-Vela-Server", self.node_id.clone())))
             .chain(std::iter::once(("Accept", "application/json".to_string())))
             .chain(std::iter::once((
                 "Content-Type",

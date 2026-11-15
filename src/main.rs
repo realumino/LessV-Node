@@ -56,8 +56,7 @@ fn usage() {
          \x20 vela-server version\n\
          \n\
          enroll options: --config PATH, --poll-interval N, --xray-binary PATH,\n\
-         \x20 --config-path PATH, --xray-service NAME, --restart-mode systemd|openrc|s6|auto,\n\
-         \x20 --no-manage-nginx, --cert-dir PATH, --nginx-service NAME,\n\
+         \x20 --config-path PATH, --no-manage-nginx, --cert-dir PATH,\n\
          \x20 --nginx-conf-path PATH, --nginx-root PATH, --cert-group NAME, --state PATH,\n\
          \x20 --geodata-dir PATH\n\
          \n\
@@ -214,9 +213,6 @@ fn cmd_enroll(args: &[String]) -> i32 {
     }
     for (flag, field) in [
         ("xray-binary", &mut cfg.xray_binary),
-        ("xray-service", &mut cfg.xray_service),
-        ("restart-mode", &mut cfg.restart_mode),
-        ("nginx-service", &mut cfg.nginx_service),
         ("cert-group", &mut cfg.cert_group),
     ] {
         if let Some(value) = flags.value(flag) {

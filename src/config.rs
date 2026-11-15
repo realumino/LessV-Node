@@ -29,14 +29,10 @@ pub struct Config {
     pub poll_interval: u64,
     pub xray_binary: String,
     pub config_path: PathBuf,
-    pub xray_service: String,
-    /// `systemd`, `openrc`, `s6`, or `auto` (detect the running supervisor).
-    pub restart_mode: String,
     pub auth: String,
     pub stats_interval: u64,
     pub manage_nginx: bool,
     pub cert_dir: PathBuf,
-    pub nginx_service: String,
     pub nginx_conf_path: PathBuf,
     pub nginx_root: PathBuf,
     /// Unix socket the decoy listens on; REALITY's `dest` points here.
@@ -57,13 +53,10 @@ impl Default for Config {
             poll_interval: 30,
             xray_binary: "xray".to_string(),
             config_path: PathBuf::from(DEFAULT_XRAY_CONFIG),
-            xray_service: "xray".to_string(),
-            restart_mode: "auto".to_string(),
             auth: "bearer-v1".to_string(),
             stats_interval: 60,
             manage_nginx: true,
             cert_dir: PathBuf::from(DEFAULT_CERT_DIR),
-            nginx_service: "nginx".to_string(),
             nginx_conf_path: PathBuf::from(DEFAULT_NGINX_CONF),
             nginx_root: PathBuf::from(DEFAULT_DECOY_ROOT),
             nginx_socket: PathBuf::from(DEFAULT_DECOY_SOCKET),
@@ -168,11 +161,12 @@ pub fn parse(text: &str, path: &Path) -> Result<Config, ConfigError> {
             "token" => cfg.token = as_string(value)?,
             "xray_binary" => cfg.xray_binary = as_string(value)?,
             "config_path" => cfg.config_path = PathBuf::from(as_string(value)?),
-            "xray_service" => cfg.xray_service = as_string(value)?,
-            "restart_mode" => cfg.restart_mode = as_string(value)?,
+            // A node.toml written by a bare-metal install carries these keys.
+            // The image fixes them, and a re-enroll rewrites the file;
+            // tolerating them keeps an existing volume bootable.
+            "xray_service" | "nginx_service" | "restart_mode" => {}
             "auth" => cfg.auth = as_string(value)?,
             "cert_dir" => cfg.cert_dir = PathBuf::from(as_string(value)?),
-            "nginx_service" => cfg.nginx_service = as_string(value)?,
             "nginx_conf_path" => cfg.nginx_conf_path = PathBuf::from(as_string(value)?),
             "nginx_root" => cfg.nginx_root = PathBuf::from(as_string(value)?),
             "nginx_socket" => cfg.nginx_socket = PathBuf::from(as_string(value)?),
@@ -242,12 +236,6 @@ pub fn validate(mut cfg: Config, path: &Path) -> Result<Config, ConfigError> {
             path.display()
         )));
     }
-    if !["systemd", "openrc", "s6", "auto"].contains(&cfg.restart_mode.as_str()) {
-        return Err(ConfigError(format!(
-            "restart_mode must be \"systemd\", \"openrc\", \"s6\", or \"auto\" in {}",
-            path.display()
-        )));
-    }
     if cfg.auth != "bearer-v1" {
         return Err(ConfigError(format!(
             "auth {:?} not supported (only \"bearer-v1\") in {}",
@@ -270,12 +258,6 @@ pub fn validate(mut cfg: Config, path: &Path) -> Result<Config, ConfigError> {
                 path.display()
             )));
         }
-    }
-    if cfg.nginx_service.is_empty() || cfg.xray_service.is_empty() {
-        return Err(ConfigError(format!(
-            "service names must not be empty in {}",
-            path.display()
-        )));
     }
     Ok(cfg)
 }
@@ -307,11 +289,8 @@ pub fn to_toml(cfg: &Config) -> String {
         ("token", cfg.token.as_str()),
         ("xray_binary", cfg.xray_binary.as_str()),
         ("config_path", &cfg.config_path.to_string_lossy()),
-        ("xray_service", cfg.xray_service.as_str()),
-        ("restart_mode", cfg.restart_mode.as_str()),
         ("auth", cfg.auth.as_str()),
         ("cert_dir", &cfg.cert_dir.to_string_lossy()),
-        ("nginx_service", cfg.nginx_service.as_str()),
         ("nginx_conf_path", &cfg.nginx_conf_path.to_string_lossy()),
         ("nginx_root", &cfg.nginx_root.to_string_lossy()),
         ("nginx_socket", &cfg.nginx_socket.to_string_lossy()),
@@ -360,14 +339,12 @@ mod tests {
         let mut cfg = sample();
         cfg.cert_group = "www-data".to_string();
         cfg.manage_nginx = false;
-        cfg.restart_mode = "openrc".to_string();
         cfg.geodata_dir = PathBuf::from("/srv/lessv-assets");
         save(&path, &cfg).unwrap();
         let loaded = load(Some(&path)).unwrap();
         assert_eq!(loaded.geodata_dir, PathBuf::from("/srv/lessv-assets"));
         assert_eq!(loaded.cert_group, "www-data");
         assert!(!loaded.manage_nginx);
-        assert_eq!(loaded.restart_mode, "openrc");
         assert_eq!(loaded.cp_url, "https://cp.example.org");
         let mode = std::fs::metadata(&path).unwrap().permissions().mode() & 0o777;
         assert_eq!(mode, 0o600);
@@ -385,12 +362,6 @@ mod tests {
         )
         .unwrap_err();
         assert!(err.0.contains("poll_interval"));
-        let err = parse(
-            "cp_url = \"https://x\"\nnode_id = \"n\"\ntoken = \"t\"\nrestart_mode = \"docker\"\n",
-            path,
-        )
-        .unwrap_err();
-        assert!(err.0.contains("restart_mode"));
         let err = parse("token = \"unterminated\n", path).unwrap_err();
         assert!(err.0.contains("unterminated"));
     }
@@ -402,20 +373,16 @@ mod tests {
     }
 
     #[test]
-    fn accepts_s6_as_a_restart_mode() {
+    fn ignores_the_keys_a_bare_metal_toml_carries() {
+        // An existing volume must still boot after the image dropped the
+        // init-system knobs; a re-enroll rewrites the file without them.
         let path = Path::new("/tmp/node.toml");
         let parsed = parse(
-            "cp_url = \"https://x\"\nnode_id = \"n\"\ntoken = \"t\"\nrestart_mode = \"s6\"\n",
+            "cp_url = \"https://x\"\nnode_id = \"n\"\ntoken = \"t\"\nrestart_mode = \"systemd\"\nxray_service = \"xray\"\nnginx_service = \"nginx\"\n",
             path,
         )
         .unwrap();
-        assert_eq!(parsed.restart_mode, "s6");
-        // Misspellings stay loud: `s6-svc` is not the mode name.
-        assert!(parse(
-            "cp_url = \"https://x\"\nnode_id = \"n\"\ntoken = \"t\"\nrestart_mode = \"s6-svc\"\n",
-            path,
-        )
-        .is_err());
+        assert_eq!(parsed.node_id, "n");
     }
 
     #[test]

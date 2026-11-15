@@ -2,16 +2,12 @@
 
 The node side of [Vela](https://github.com/realumino/LessV): a static Rust
 reconciler that pulls its desired state from the control plane and converges
-Xray, the certificate tree, and the nginx decoy on one host — as a bare-metal
-install, or as a single OCI image.
+Xray, the certificate tree, and the nginx decoy inside one container.
 
-This repository was split out of the control plane's tree and carries two
-delivery paths that share one binary:
-
-| Path | Artefact | Supervisor |
-|---|---|---|
-| Container | `ghcr.io/realumino/vela-server` (one image: node, nginx, Xray) | s6-overlay |
-| Bare metal | release tarball from Gitee (`install.sh` + units) | systemd or OpenRC |
+It ships as one thing: the `ghcr.io/realumino/vela-server` image (node, nginx,
+Xray, supervised by s6-overlay). Docker or any OCI runtime is the only
+supported way to run it — the image is what makes the node reproducible, and
+there is no second delivery path to keep in step.
 
 The node is a reconciler, not a proxy: it holds no listener of its own, never
 serves traffic, and its only job is to make the host match the plane.
@@ -146,37 +142,28 @@ may bind them.
 
 Host-level concerns stay on the host: the firewall, `net.ipv4.tcp_congestion_control`
 (BBR), IPv6 reachability, and the plane's address allow-lists all apply to the
-container exactly as they would to a bare-metal node.
+container exactly as they would to a server running directly on the machine.
 
 ---
 
-## Runtime modes
+## Supervision
 
-`restart_mode` in `node.toml` selects the process supervisor. `auto` is the
-default for bare-metal enrollments and resolves in the order systemd → OpenRC →
-s6; pin it explicitly when detection is ambiguous.
+s6-overlay owns the three processes inside the image:
 
-| `restart_mode` | Detected by | `status()` | `start()` | `restart()` | `reload()` |
-|---|---|---|---|---|---|
-| `systemd` | `/run/systemd/system` | `systemctl is-active` + `show -p MainPID` | `systemctl start` | `systemctl restart` | `systemctl reload` |
-| `openrc` | `/sbin/rc-service` (or `/sbin/openrc-run`) | `rc-service <svc> status` + pidfile/`/proc` | `rc-service <svc> start` | `rc-service <svc> restart` | `rc-service <svc> reload` |
-| `s6` | `/run/service` + `s6-svstat` on `PATH` | `s6-svstat -o up,pid,updownfor` + process name | `s6-svc -u` | `s6-svc -r` | `s6-svc -h` (SIGHUP) |
-| `auto` | the first of the three that matches | — | — | — | — |
+| Service | Started by | Reload |
+|---|---|---|
+| `vela-server` | the s6 tree, once `node.toml` exists | — |
+| `xray` | the s6 tree, once a live config exists | none: Xray handles only SIGTERM, so a config change is a restart |
+| `nginx` | the s6 tree | `s6-svc -h` (SIGHUP), which is what `nginx -s reload` sends |
 
-The image enrolls with `restart_mode = "s6"`. s6's reload verb is SIGHUP, which
-is exactly what `nginx -s reload` sends; Xray has no reload at all (it handles
-only SIGTERM), so every Xray config change is a stop+start.
+Liveness is read from `s6-svstat -o up,pid,updownfor` and the supervised
+process's name in `/proc/<pid>/comm`; the settle window is what makes a
+crash-looping Xray read as *not* survived, so a bad config rolls back. Docker
+restarts the container only when PID 1 dies, which is a bug worth reporting.
 
 ---
 
 ## Operational notes
-
-**Plane-driven Xray updates drift on recreate.** `update_xray` from the plane
-replaces `/usr/local/bin/xray` inside the running container. That change lives
-in the writable layer, so `docker compose up --force-recreate` (or an upgrade)
-returns to the version baked into the image tag. Nothing is silent about it: the
-plane's version report follows the binary that is actually running. Treat image
-tags, not plane actions, as the durable source of the Xray version.
 
 **Upgrades.** `docker compose pull && docker compose up -d`. Traffic survives;
 `vela-etc` and `vela-state` are untouched and the applied hash still matches,
@@ -256,29 +243,6 @@ hermetic crate tests, the image build assertions, the stub plane, a real plane
 via `wrangler dev`, and a throwaway host with real ports — plus what each one
 cannot prove and the failure policy.
 
-### The bare-metal tarball
-
-```sh
-node scripts/release_node.mjs [--targets amd64,arm64] [--upload]
-```
-
-Builds `vela-server-<version>-linux-<arch>.tar.gz` (binary, `install.sh`,
-`VERSION`, `systemd/`, `openrc/`) plus `SHA256SUMS` into `dist/`. `--upload`
-publishes to the Gitee release `node-v<version>` and needs `GITEE_TOKEN` (or
-`--token-file`); without it the release is manual. The `node-v*` tag namespace
-is shared with the image pipeline: one tag, two artefacts.
-
-On the host:
-
-```sh
-./install.sh --cp https://cp.example.org --node tokyo01
-```
-
-`install.sh` installs nginx, Xray, the unit files, and the host layout, then
-runs `vela-server enroll`. See the script's `--help` for the knobs.
-
----
-
 ## Repository layout
 
 ```
@@ -286,9 +250,7 @@ src/               the reconciler (Rust, static musl binary)
 Dockerfile         three stages: crate build, downloads, runtime
 image/s6-overlay/  s6 service definitions for nginx, xray, vela-server
 compose.yaml       one service, one node
-install.sh         bare-metal installer (shared with the tarball)
-systemd/ openrc/   unit files for bare-metal installs
-scripts/           release tooling (tarball, Gitee)
+scripts/           a stub plane for local testing
 .github/workflows/ image build and publish
 ```
 

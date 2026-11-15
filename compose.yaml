@@ -8,7 +8,7 @@
 #   docker run --rm -it -v vela-etc:/etc/vela \
 #     --entrypoint /usr/local/bin/vela-server ghcr.io/realumino/vela-server:latest \
 #     enroll --cp https://cp.example.org --node tokyo01 \
-#     --restart-mode s6 --nginx-conf-path /etc/nginx/http.d/vela-decoy.conf
+#     --nginx-conf-path /etc/nginx/http.d/vela-decoy.conf
 # (the node token is read from stdin)
 services:
   vela-server:
@@ -38,7 +38,7 @@ services:
     # vela-server's own timeout-kill (60 s).
     stop_grace_period: 90s
 
-    # Matches LimitNOFILE= in the systemd units and rc_ulimit in the OpenRC ones.
+    # The image's processes inherit this ceiling.
     ulimits:
       nofile: 1000000
 

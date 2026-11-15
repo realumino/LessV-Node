@@ -100,8 +100,8 @@ python3 scripts/dev_stub_plane.py --state-dir "$STATE" --port 8080
 ```
 
 Then, for each phase, write `$STATE/state.json` and let a node converge against
-it. Enroll once (`--cp http://127.0.0.1:8080`, `--restart-mode s6`,
-`--nginx-conf-path /etc/nginx/http.d/vela-decoy.conf`), then run the phases:
+it. Enroll once (`--cp http://127.0.0.1:8080`, `--nginx-conf-path
+/etc/nginx/http.d/vela-decoy.conf`), then run the phases:
 
 | Phase | `state.json` | Expected |
 |---|---|---|
@@ -153,8 +153,8 @@ as a big one):
 
 1. `docker compose up -d` with the image under test, volumes as in
    `compose.yaml`, `network_mode: bridge` plus `ports:`.
-2. Enroll from a second shell, token on stdin, `--restart-mode s6`,
-   `--nginx-conf-path /etc/nginx/http.d/vela-decoy.conf`.
+2. Enroll from a second shell, token on stdin, `--nginx-conf-path
+   /etc/nginx/http.d/vela-decoy.conf`.
 3. Assert, from **outside** the host:
 
    ```sh

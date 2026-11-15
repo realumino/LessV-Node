@@ -70,8 +70,8 @@ jobs:
           [ -n "$version" ] || { echo "cannot read the version from Cargo.toml" >&2; exit 1; }
           xray_version=$(sed -n 's/^ARG XRAY_VERSION=\(.*\)$/\1/p' Dockerfile | head -n 1)
           [ -n "$xray_version" ] || { echo "cannot read ARG XRAY_VERSION from the Dockerfile" >&2; exit 1; }
-          # GHCR requires a lowercase path: realumino/LessV-Node -> vela-server.
-          image="ghcr.io/${GITHUB_REPOSITORY,,}"
+          # The image is named after the product, not after this repository.
+          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/vela-server"
 
           publishing=false
           tags=""

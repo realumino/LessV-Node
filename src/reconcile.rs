@@ -69,8 +69,12 @@ pub struct Runner<'a> {
 }
 
 impl Runner<'_> {
-    fn service(&self) -> &str {
-        &self.cfg.xray_service
+    /// WHAT: the supervision-tree name of Xray.
+    ///
+    /// WHY a constant: the image's s6 tree names its services, and the server
+    /// is only ever run from that image.
+    fn service(&self) -> &'static str {
+        "xray"
     }
 
     fn save(&self, state: &State) {
@@ -339,7 +343,7 @@ impl Runner<'_> {
     fn sync_certificates(&self, state: &mut State) {
         let system = SystemNginx {
             supervisor: self.supervisor,
-            service: self.cfg.nginx_service.clone(),
+            service: "nginx".to_string(),
         };
         let client = self.client;
         let fetch = |etag: Option<&str>| {
@@ -429,19 +433,12 @@ impl Runner<'_> {
 
 /// WHAT: startup-check the live config and then run the loop.
 pub fn run(cfg: &Config, state_path: PathBuf, stop: &AtomicBool, verbose: bool) -> i32 {
-    let supervisor = match Supervisor::from_mode(&cfg.restart_mode) {
-        Ok(supervisor) => supervisor,
-        Err(error) => {
-            log_error(&error);
-            return 2;
-        }
-    };
+    let supervisor = Supervisor;
     log_info(&format!(
-        "vela-server {} starting (control plane {}, node {}, init {})",
+        "vela-server {} starting (control plane {}, node {}, init s6)",
         crate::http::VERSION,
         cfg.cp_url,
-        cfg.node_id,
-        supervisor.init.as_str()
+        cfg.node_id
     ));
     let client = NodeClient::new(cfg);
     let xray_version = xray::binary_path(&cfg.xray_binary)
