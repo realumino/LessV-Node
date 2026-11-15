@@ -1,4 +1,4 @@
-//! Node configuration: `/etc/lessv/node.toml`.
+//! Node configuration: `/etc/vela/node.toml`.
 //!
 //! WHAT: parse, validate, and atomically write the one file an operator may
 //! edit by hand (the token is written by `enroll` and shown once).
@@ -12,14 +12,14 @@ use std::path::{Path, PathBuf};
 
 use crate::util::atomic_write;
 
-pub const DEFAULT_CONFIG_PATH: &str = "/etc/lessv/node.toml";
-pub const DEFAULT_STATE_PATH: &str = "/var/lib/lessv/state.json";
-pub const DEFAULT_XRAY_CONFIG: &str = "/var/lib/lessv/config.json";
-pub const DEFAULT_CERT_DIR: &str = "/etc/lessv/certs";
-pub const DEFAULT_DECOY_ROOT: &str = "/var/www/lessv-decoy";
-pub const DEFAULT_NGINX_CONF: &str = "/etc/nginx/conf.d/lessv-decoy.conf";
+pub const DEFAULT_CONFIG_PATH: &str = "/etc/vela/node.toml";
+pub const DEFAULT_STATE_PATH: &str = "/var/lib/vela/state.json";
+pub const DEFAULT_XRAY_CONFIG: &str = "/var/lib/vela/config.json";
+pub const DEFAULT_CERT_DIR: &str = "/etc/vela/certs";
+pub const DEFAULT_DECOY_ROOT: &str = "/var/www/vela-decoy";
+pub const DEFAULT_NGINX_CONF: &str = "/etc/nginx/conf.d/vela-decoy.conf";
 pub const DEFAULT_DECOY_SOCKET: &str = "/dev/shm/lessv-decoy.sock";
-pub const DEFAULT_GEODATA_DIR: &str = "/var/lib/lessv/assets";
+pub const DEFAULT_GEODATA_DIR: &str = "/var/lib/vela/assets";
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Config {
@@ -218,7 +218,7 @@ pub fn validate(mut cfg: Config, path: &Path) -> Result<Config, ConfigError> {
     ] {
         if value.is_empty() {
             return Err(ConfigError(format!(
-                "missing {field} in {} (run `lessv-node enroll` to create it)",
+                "missing {field} in {} (run `vela-server enroll` to create it)",
                 path.display()
             )));
         }
@@ -285,7 +285,7 @@ pub fn load(explicit: Option<&Path>) -> Result<Config, ConfigError> {
     let path = default_config_path(explicit);
     let bytes = std::fs::read(&path).map_err(|_| {
         ConfigError(format!(
-            "config not found at {} (run `lessv-node enroll --cp <url> --node <id>`)",
+            "config not found at {} (run `vela-server enroll --cp <url> --node <id>`)",
             path.display()
         ))
     })?;

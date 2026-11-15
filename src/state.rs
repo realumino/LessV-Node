@@ -1,4 +1,4 @@
-//! Reconcile state: `/var/lib/lessv/state.json`.
+//! Reconcile state: `/var/lib/vela/state.json`.
 //!
 //! WHAT: the facts the loop needs across restarts (applied hash, last result,
 //! certificate ETag, nginx health, Xray boot id).
@@ -123,7 +123,7 @@ mod tests {
 
     #[test]
     fn defaults_when_missing_and_corrupt() {
-        let dir = std::env::temp_dir().join(format!("lessv-state-{}", crate::util::random_hex(6)));
+        let dir = std::env::temp_dir().join(format!("vela-state-{}", crate::util::random_hex(6)));
         std::fs::create_dir_all(&dir).unwrap();
         let path = temp_path(&dir);
         assert_eq!(load(&path), State::default());
@@ -134,7 +134,7 @@ mod tests {
 
     #[test]
     fn round_trip_keeps_fields() {
-        let dir = std::env::temp_dir().join(format!("lessv-state-{}", crate::util::random_hex(6)));
+        let dir = std::env::temp_dir().join(format!("vela-state-{}", crate::util::random_hex(6)));
         std::fs::create_dir_all(&dir).unwrap();
         let path = temp_path(&dir);
         let state = State {

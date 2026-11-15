@@ -351,7 +351,7 @@ mod tests {
 
     #[test]
     fn unknown_service_has_no_pid() {
-        assert_eq!(service_pid("lessv-node-does-not-exist"), 0);
+        assert_eq!(service_pid("vela-server-does-not-exist"), 0);
     }
 
     #[test]

@@ -16,7 +16,7 @@
  *   node scripts/release_node.mjs [--targets amd64,arm64] [--upload]
  *     [--token-file <path>] [--owner <owner>] [--repo <repo>]
  *
- * The tarball deliberately stays on the LessV Gitee release
+ * The tarball deliberately stays on the Vela Gitee release
  * (gitee.com/realumino/lessv, tag node-v<version>): that is where install.sh
  * and the Alpine cloud-init profile look for it. The same tag also triggers
  * the image pipeline, so one tag publishes two artifacts.
@@ -284,7 +284,7 @@ if (release === null) {
     tag_name: tag,
     name: `lessv-node ${version}`,
     body: [
-      `Static Linux binaries of the LessV node reconciler ${version}.`,
+      `Static Linux binaries of the Vela node reconciler ${version}.`,
       "",
       "Assets:",
       "- `lessv-node-<version>-linux-amd64.tar.gz` / `-arm64.tar.gz` (binary, install.sh, units)",

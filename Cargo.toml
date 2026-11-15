@@ -1,9 +1,9 @@
 [package]
-name = "lessv-node"
-version = "0.6.0"
+name = "vela-server"
+version = "0.7.0"
 edition = "2021"
 rust-version = "1.80"
-description = "LessV node reconciler: pulls Xray config and certificates from the control plane"
+description = "Vela server reconciler: pulls Xray config and certificates from the control plane"
 license = "AGPL-3.0-or-later"
 
 # One static binary, no runtime dependencies. TLS is rustls (pure Rust plus

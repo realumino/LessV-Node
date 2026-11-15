@@ -238,7 +238,7 @@ mod tests {
 
     #[test]
     fn command_timeout_and_missing_binary() {
-        let missing = run_command("lessv-node-no-such-binary", &[], Duration::from_secs(1));
+        let missing = run_command("vela-server-no-such-binary", &[], Duration::from_secs(1));
         assert_eq!(missing.code, 127);
         let slow = run_command("sh", &["-c", "sleep 5"], Duration::from_millis(200));
         assert!(slow.timed_out);

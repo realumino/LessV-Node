@@ -1,4 +1,4 @@
-# WHAT: build, verify, and publish the lessv-node image.
+# WHAT: build, verify, and publish the vela-server image.
 #
 # WHY native runners per architecture: the release build is opt-level=z + LTO +
 # codegen-units=1; building arm64 under QEMU on an amd64 runner costs an hour
@@ -70,7 +70,7 @@ jobs:
           [ -n "$version" ] || { echo "cannot read the version from Cargo.toml" >&2; exit 1; }
           xray_version=$(sed -n 's/^ARG XRAY_VERSION=\(.*\)$/\1/p' Dockerfile | head -n 1)
           [ -n "$xray_version" ] || { echo "cannot read ARG XRAY_VERSION from the Dockerfile" >&2; exit 1; }
-          # GHCR requires a lowercase path: realumino/LessV-Node -> lessv-node.
+          # GHCR requires a lowercase path: realumino/LessV-Node -> vela-server.
           image="ghcr.io/${GITHUB_REPOSITORY,,}"
 
           publishing=false
@@ -101,7 +101,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
           {
-            echo "### lessv-node image"
+            echo "### vela-server image"
             echo ""
             echo "| | |"
             echo "|---|---|"

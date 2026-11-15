@@ -1,5 +1,5 @@
 [Unit]
-Description=LessV node reconciler (Xray config and certificate convergence)
+Description=Vela node reconciler (Xray config and certificate convergence)
 Documentation=https://gitee.com/realumino/lessv
 After=network-online.target
 Wants=network-online.target
@@ -7,14 +7,14 @@ Wants=network-online.target
 [Service]
 Type=simple
 # One static binary: no interpreter, no PYTHONPATH, no site-packages.
-ExecStart=/usr/local/bin/lessv-node run --config /etc/lessv/node.toml
+ExecStart=/usr/local/bin/vela-server run --config /etc/vela/node.toml
 Restart=on-failure
 RestartSec=5
 User=root
 Group=root
 # node.toml holds the node token (0600); state holds the applied hash; the
 # decoy root and certificate tree are written by the reconciler.
-ReadWritePaths=/etc/lessv /var/lib/lessv /var/www/lessv-decoy
+ReadWritePaths=/etc/vela /var/lib/vela /var/www/vela-decoy
 # Match the xray unit's fd ceiling.
 LimitNOFILE=1000000
 NoNewPrivileges=true

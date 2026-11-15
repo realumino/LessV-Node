@@ -17,12 +17,12 @@ directory of files:
 
 WHY it exists: the real plane's admin API is behind Cloudflare Access, so a
 plane-authored config cannot be produced from CI or from a shell. This stub
-answers the same shapes as `LessV/src/routers/node.ts`, so the image can be
+answers the same shapes as `Vela/src/routers/node.ts`, so the image can be
 driven through apply, certificate sync, rollback, recreate and update on any
 host, with zero external dependencies.
 
 WHY not just `wrangler dev`: both are useful and they test different things.
-`wrangler dev` gives the plane's own renderer (see LessV docs/dev/testing.md);
+`wrangler dev` gives the plane's own renderer (see Vela docs/dev/testing.md);
 this gives deterministic phases and no Cloudflare account. Neither replaces a
 real node on a real host.
 
@@ -75,7 +75,7 @@ def empty_manifest():
     """WHAT: the etag the plane returns for "no certificates".
 
     WHY this exact value: it is the sha256 of the empty string in the same
-    quoted-hex form LessV's `manifestEtag` produces, so the node's ETag
+    quoted-hex form Vela's `manifestEtag` produces, so the node's ETag
     comparison behaves exactly as it does against the real plane.
     """
     return {"etag": '"%s"' % sha256(b"").hexdigest(), "certs": []}

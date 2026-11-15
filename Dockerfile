@@ -1,4 +1,4 @@
-# WHAT: one OCI image carrying the whole node -- lessv-node, nginx, Xray, and
+# WHAT: one OCI image carrying the whole node -- vela-server, nginx, Xray, and
 # the s6 supervisor that owns the three processes.
 #
 # WHY one image and not three: the agent restarts Xray and reloads nginx after
@@ -30,9 +30,9 @@ RUN apk add --no-cache build-base
 COPY Cargo.toml Cargo.lock ./
 COPY src ./src
 RUN cargo build --locked --release \
- && test -x target/release/lessv-node \
- && if readelf -l target/release/lessv-node | grep -q INTERP; then \
-        echo "lessv-node is dynamically linked; the image needs a static binary" >&2; \
+ && test -x target/release/vela-server \
+ && if readelf -l target/release/vela-server | grep -q INTERP; then \
+        echo "vela-server is dynamically linked; the image needs a static binary" >&2; \
         exit 1; \
     fi
 
@@ -84,9 +84,9 @@ FROM ${ALPINE_IMAGE} AS runtime
 ARG VERSION
 ARG XRAY_VERSION=v26.11.9
 
-LABEL org.opencontainers.image.title="lessv-node" \
-      org.opencontainers.image.description="LessV node reconciler with Xray, the nginx decoy, and s6 supervision" \
-      org.opencontainers.image.source="https://github.com/realumino/LessV-Node" \
+LABEL org.opencontainers.image.title="vela-server" \
+      org.opencontainers.image.description="Vela node reconciler with Xray, the nginx decoy, and s6 supervision" \
+      org.opencontainers.image.source="https://github.com/realumino/Vela-Node" \
       org.opencontainers.image.licenses="AGPL-3.0-or-later" \
       org.opencontainers.image.version="${VERSION}"
 
@@ -95,7 +95,7 @@ LABEL org.opencontainers.image.title="lessv-node" \
 # `#!/command/with-contenv sh` to import it — this variable is how the supervised
 # Xray finds geoip.dat/geosite.dat (a config with `geoip:` rules dies without it,
 # which is exactly what the plane's geo-block preset renders).
-ENV XRAY_LOCATION_ASSET=/var/lib/lessv/assets
+ENV XRAY_LOCATION_ASSET=/var/lib/vela/assets
 
 # WHY a zero kill grace: with s6-linux-init's default (3 s), the final sweep of
 # the shutdown procedure kills its own process group, so `docker stop` on any
@@ -117,7 +117,7 @@ RUN apk add --no-cache nginx \
 # The s6 supervision tree, the two binaries, and the three service definitions.
 COPY --from=fetch /out/s6/ /
 COPY image/s6-overlay/ /etc/s6-overlay/
-COPY --from=builder /src/target/release/lessv-node /usr/local/bin/lessv-node
+COPY --from=builder /src/target/release/vela-server /usr/local/bin/vela-server
 COPY --from=fetch /out/xray/xray /usr/local/bin/xray
 RUN chmod 0755 /etc/s6-overlay/s6-rc.d/*/run
 
@@ -139,15 +139,15 @@ RUN nginx -t
 RUN [ "$(/usr/local/bin/xray version | head -n 1 | awk '{print $2}')" = "${XRAY_VERSION#v}" ]
 
 # Assertion 4: the binary reports the version this image is tagged with.
-RUN [ "$(/usr/local/bin/lessv-node version)" = "lessv-node ${VERSION}" ]
+RUN [ "$(/usr/local/bin/vela-server version)" = "vela-server ${VERSION}" ]
 
 # Assertion 5: both entry points exist and are executable (the node binary's
 # static-ness was asserted in the builder, next to the build that produced it).
-RUN test -x /usr/local/bin/lessv-node && test -x /usr/local/bin/xray
+RUN test -x /usr/local/bin/vela-server && test -x /usr/local/bin/xray
 
 # Documentation only: with host networking nothing is published.
 EXPOSE 80 443
-VOLUME ["/etc/lessv", "/var/lib/lessv"]
+VOLUME ["/etc/vela", "/var/lib/vela"]
 
 STOPSIGNAL SIGTERM
 ENTRYPOINT ["/init"]

@@ -1,7 +1,7 @@
 #!/bin/sh
-# LessV node installer: dependencies, nginx, Xray, services, enroll.
+# Vela node installer: dependencies, nginx, Xray, services, enroll.
 #
-# WHAT: installs the single static `lessv-node` binary plus the service
+# WHAT: installs the single static `vela-server` binary plus the service
 # definitions, provisions nginx (decoy origin) and Xray (REALITY on 443) from
 # their vendors, creates the host layout, and enrolls the node.
 # WHY the installer owns nginx and Xray too: these nodes exist to run this
@@ -17,7 +17,7 @@
 # The token is read from a hidden prompt (or a 0600 file) and piped to the
 # binary on stdin; it never appears in argv, the environment, or a log.
 #
-# Release layout: this script ships inside lessv-node-<version>-linux-<arch>
+# Release layout: this script ships inside vela-server-<version>-linux-<arch>
 # .tar.gz next to the binary and the unit files. Run outside that layout it
 # downloads the tarball for this machine from the Gitee release.
 set -eu
@@ -26,7 +26,7 @@ OWNER="realumino"
 REPO="lessv"
 TAG_PREFIX="node-v"
 XRAY_VERSION="${LESSV_XRAY_VERSION:-v26.11.9}"
-DEFAULT_NGINX_CONF="/etc/nginx/conf.d/lessv-decoy.conf"
+DEFAULT_NGINX_CONF="/etc/nginx/conf.d/vela-decoy.conf"
 
 CP_URL=""
 NODE_ID=""
@@ -48,7 +48,7 @@ options:
   --cp <url>            control-plane base URL (required on first install)
   --node <id>           node id minted on the plane (required on first install)
   --token-file <path>   read the node token from this 0600 file instead of a prompt
-  --version <x.y.z>     lessv-node release to install (default: this bundle's)
+  --version <x.y.z>     vela-server release to install (default: this bundle's)
   --release-base <url>  override the Gitee release download base
   --xray-version <tag>  Xray release tag to install (default: v26.11.9)
   --skip-nginx          do not install/manage nginx
@@ -131,7 +131,7 @@ resolve_version() {
 # file, and this script itself are part of one release; a standalone copy
 # must install exactly what that release shipped.
 ensure_bundle() {
-    if [ -f "$SCRIPT_DIR/lessv-node" ] && [ -d "$SCRIPT_DIR/systemd" ]; then
+    if [ -f "$SCRIPT_DIR/vela-server" ] && [ -d "$SCRIPT_DIR/systemd" ]; then
         BUNDLE_DIR="$SCRIPT_DIR"
         return
     fi
@@ -140,7 +140,7 @@ ensure_bundle() {
     if [ -z "$RELEASE_BASE" ]; then
         RELEASE_BASE="https://gitee.com/${OWNER}/${REPO}/releases/download/${TAG_PREFIX}${VERSION}"
     fi
-    NAME="lessv-node-${VERSION}-linux-${ARCH}"
+    NAME="vela-server-${VERSION}-linux-${ARCH}"
     WORK=$(mktemp -d)
     trap 'rm -rf "$WORK"' EXIT
     echo "downloading ${NAME}.tar.gz from ${RELEASE_BASE}" >&2
@@ -155,11 +155,11 @@ ensure_bundle() {
     mkdir -p "$WORK/extract"
     tar -xzf "$WORK/bundle.tar.gz" -C "$WORK/extract"
     BUNDLE_DIR="$WORK/extract/$NAME"
-    [ -f "$BUNDLE_DIR/lessv-node" ] || die "release bundle is missing the binary"
+    [ -f "$BUNDLE_DIR/vela-server" ] || die "release bundle is missing the binary"
     # Archive extraction may not preserve the executable bit (for example
     # when the release tarball was assembled on a non-POSIX host); the
     # checksum already proved the bytes, so fix the mode before use.
-    chmod 0755 "$BUNDLE_DIR/lessv-node" "$BUNDLE_DIR/install.sh" 2>/dev/null || true
+    chmod 0755 "$BUNDLE_DIR/vela-server" "$BUNDLE_DIR/install.sh" 2>/dev/null || true
     VERSION=$(tr -d '[:space:]' < "$BUNDLE_DIR/VERSION")
 }
 
@@ -184,7 +184,7 @@ install_base_packages() {
 
 # WHAT: classify the installed nginx's TLS library for post-quantum support.
 #
-# WHY this is checked at install time and not only at apply time: lessv-node
+# WHY this is checked at install time and not only at apply time: vela-server
 # refuses to apply a decoy that cannot offer the hybrid group — it fails the
 # decoy (`nginx -t` rejects `ssl_ecdh_curve`) rather than silently serving
 # classical TLS. Telling the operator now, before the first certificate
@@ -238,16 +238,16 @@ install_nginx() {
     else
         NGINX_CONF_DIR="/etc/nginx/conf.d"
     fi
-    NGINX_CONF_PATH="$NGINX_CONF_DIR/lessv-decoy.conf"
+    NGINX_CONF_PATH="$NGINX_CONF_DIR/vela-decoy.conf"
     mkdir -p "$NGINX_CONF_DIR"
     if ! nginx -t >/dev/null 2>&1; then
-        echo "warning: nginx -t fails before the first certificate sync; lessv-node will write the decoy config and reload" >&2
+        echo "warning: nginx -t fails before the first certificate sync; vela-server will write the decoy config and reload" >&2
     fi
     case "$(nginx_pq_state)" in
         ok) ;;
         old)
             die "nginx links an OpenSSL older than 3.5, so the decoy cannot negotiate
-X25519MLKEM768 (post-quantum). Post-quantum TLS is required — lessv-node will
+X25519MLKEM768 (post-quantum). Post-quantum TLS is required — vela-server will
 not fall back to classical key exchange. Use Debian 13+, Ubuntu 25.10+, or
 Alpine 3.22+ (or an nginx built against OpenSSL >= 3.5)."
             ;;
@@ -296,45 +296,45 @@ install_xray() {
 
 # WHAT: create the host layout, including the decoy document root.
 #
-# WHY the page itself is not written here: lessv-node owns it as a managed
+# WHY the page itself is not written here: vela-server owns it as a managed
 # artifact (it carries a marker and is refreshed on upgrades unless the
 # operator replaced it). The installer only guarantees the directory, so a
 # fresh node has its page as soon as the first certificate sync runs.
 install_layout() {
-    # /var/lib/lessv/assets is where lessv-node keeps geoip.dat/geosite.dat;
+    # /var/lib/vela/assets is where vela-server keeps geoip.dat/geosite.dat;
     # the Xray unit exports XRAY_LOCATION_ASSET to it.
-    install -d -m 0755 /etc/lessv /etc/lessv/certs /var/lib/lessv /var/lib/lessv/assets /var/www/lessv-decoy
+    install -d -m 0755 /etc/vela /etc/vela/certs /var/lib/vela /var/lib/vela/assets /var/www/vela-decoy
 }
 
 install_binary() {
-    install -m 0755 "$BUNDLE_DIR/lessv-node" /usr/local/bin/lessv-node
+    install -m 0755 "$BUNDLE_DIR/vela-server" /usr/local/bin/vela-server
 }
 
 install_units() {
     case "$INIT" in
         systemd)
             install -d -m 0755 /etc/systemd/system
-            install -m 0644 "$BUNDLE_DIR/systemd/lessv-node.service" /etc/systemd/system/lessv-node.service
+            install -m 0644 "$BUNDLE_DIR/systemd/vela-server.service" /etc/systemd/system/vela-server.service
             if [ -f /etc/systemd/system/xray.service ] \
                 && ! cmp -s /etc/systemd/system/xray.service "$BUNDLE_DIR/systemd/xray.service"; then
-                echo "warning: replacing the existing xray.service (backup: /etc/systemd/system/xray.service.lessv-backup)" >&2
-                cp /etc/systemd/system/xray.service /etc/systemd/system/xray.service.lessv-backup
+                echo "warning: replacing the existing xray.service (backup: /etc/systemd/system/xray.service.vela-backup)" >&2
+                cp /etc/systemd/system/xray.service /etc/systemd/system/xray.service.vela-backup
             fi
             install -m 0644 "$BUNDLE_DIR/systemd/xray.service" /etc/systemd/system/xray.service
             # The earlier Python agent pinned the vendor unit through a
             # drop-in; our unit already owns ExecStart, so the drop-in is
             # redundant and would only mask a future edit.
-            if [ -f /etc/systemd/system/xray.service.d/99-lessv.conf ]; then
-                rm -f /etc/systemd/system/xray.service.d/99-lessv.conf
+            if [ -f /etc/systemd/system/xray.service.d/99-vela.conf ]; then
+                rm -f /etc/systemd/system/xray.service.d/99-vela.conf
                 rmdir /etc/systemd/system/xray.service.d 2>/dev/null || true
             fi
             systemctl daemon-reload
             ;;
         openrc)
-            install -m 0755 "$BUNDLE_DIR/openrc/lessv-node.initd" /etc/init.d/lessv-node
+            install -m 0755 "$BUNDLE_DIR/openrc/vela-server.initd" /etc/init.d/vela-server
             install -m 0755 "$BUNDLE_DIR/openrc/xray.initd" /etc/init.d/xray
             if [ -d /etc/logrotate.d ]; then
-                install -m 0644 "$BUNDLE_DIR/openrc/lessv-logrotate" /etc/logrotate.d/lessv
+                install -m 0644 "$BUNDLE_DIR/openrc/vela-logrotate" /etc/logrotate.d/vela
             fi
             ;;
     esac
@@ -364,8 +364,8 @@ enroll_if_needed() {
     if [ "$SKIP_ENROLL" -eq 1 ]; then
         return
     fi
-    if [ -f /etc/lessv/node.toml ] && grep -q '^token = "' /etc/lessv/node.toml; then
-        echo "existing /etc/lessv/node.toml found; reusing its token (no re-enroll)" >&2
+    if [ -f /etc/vela/node.toml ] && grep -q '^token = "' /etc/vela/node.toml; then
+        echo "existing /etc/vela/node.toml found; reusing its token (no re-enroll)" >&2
         return
     fi
     [ -n "$CP_URL" ] || die "--cp is required for the first install"
@@ -387,11 +387,11 @@ enroll_if_needed() {
         printf '\n' >&2
     fi
     [ -n "$TOKEN" ] || die "empty token; enroll aborted"
-    printf '%s\n' "$TOKEN" | /usr/local/bin/lessv-node enroll \
+    printf '%s\n' "$TOKEN" | /usr/local/bin/vela-server enroll \
         --cp "$CP_URL" \
         --node "$NODE_ID" \
-        --config /etc/lessv/node.toml \
-        --state /var/lib/lessv/state.json \
+        --config /etc/vela/node.toml \
+        --state /var/lib/vela/state.json \
         --restart-mode "$INIT" \
         --nginx-conf-path "$NGINX_CONF_PATH"
     TOKEN=""
@@ -402,19 +402,19 @@ enroll_if_needed() {
 start_services() {
     case "$INIT" in
         systemd)
-            systemctl enable lessv-node.service >/dev/null
+            systemctl enable vela-server.service >/dev/null
             if [ "$SKIP_XRAY" -eq 0 ]; then
                 systemctl enable xray.service >/dev/null
             fi
-            systemctl restart lessv-node.service
+            systemctl restart vela-server.service
             ;;
         openrc)
-            rc-update add lessv-node default >/dev/null
+            rc-update add vela-server default >/dev/null
             if [ "$SKIP_XRAY" -eq 0 ]; then
                 rc-update add xray default >/dev/null
             fi
-            rc-service lessv-node stop >/dev/null 2>&1 || true
-            rc-service lessv-node start
+            rc-service vela-server stop >/dev/null 2>&1 || true
+            rc-service vela-server start
             ;;
     esac
 }
@@ -431,7 +431,7 @@ enroll_if_needed
 start_services
 
 case "$INIT" in
-    systemd) LOG_HINT="journalctl -u lessv-node -n 50" ;;
-    openrc) LOG_HINT="tail -n 50 /var/log/lessv-node.log" ;;
+    systemd) LOG_HINT="journalctl -u vela-server -n 50" ;;
+    openrc) LOG_HINT="tail -n 50 /var/log/vela-server.log" ;;
 esac
-echo "lessv-node installed and started (config: /etc/lessv/node.toml; logs: $LOG_HINT)"
+echo "vela-server installed and started (config: /etc/vela/node.toml; logs: $LOG_HINT)"

@@ -1,7 +1,7 @@
 # Rotate the OpenRC log files written by supervise-daemon.
 # copytruncate keeps the open file descriptor valid across rotations.
 
-/var/log/lessv-node.log /var/log/xray.log {
+/var/log/vela-server.log /var/log/xray.log {
     weekly
     rotate 4
     missingok

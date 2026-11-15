@@ -43,10 +43,10 @@ pub const PQ_CURVES: &str = "X25519MLKEM768:X25519";
 /// WHY a marker and not a hash: an operator may replace the page with their
 /// own. The node rewrites the file only while this marker is present, so a
 /// customized page survives upgrades and a managed page follows them.
-pub const DECOY_PAGE_MARKER: &str = "<!-- lessv-node-decoy-page -->";
+pub const DECOY_PAGE_MARKER: &str = "<!-- vela-server-decoy-page -->";
 
 const HEADER: &str = "\
-# Managed by lessv-node. Regenerated from GET /api/node/certs on every sync;
+# Managed by vela-server. Regenerated from GET /api/node/certs on every sync;
 # edits are overwritten. Xray owns 443 — this decoy listens on a Unix socket
 # (REALITY's dest) only, and redirects plain HTTP on :80 to HTTPS.
 ";
@@ -59,7 +59,7 @@ const HEADER: &str = "\
 /// visitor's own egress address (fetched by the browser, so it shows what the
 /// visitor's connection actually exits as), and one link out.
 pub const DECOY_PAGE: &str = r##"<!doctype html>
-<!-- lessv-node-decoy-page -->
+<!-- vela-server-decoy-page -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -252,8 +252,8 @@ mod tests {
 
     fn sample_cfg() -> Config {
         Config {
-            cert_dir: "/etc/lessv/certs".into(),
-            nginx_root: "/var/www/lessv-decoy".into(),
+            cert_dir: "/etc/vela/certs".into(),
+            nginx_root: "/var/www/vela-decoy".into(),
             ..Config::default()
         }
     }
@@ -284,9 +284,9 @@ mod tests {
             .find("listen 80 default_server")
             .unwrap()
             < wildcard_index);
-        assert!(body.contains("/etc/lessv/certs/wildcard.example.org/current/fullchain.pem"));
-        assert!(body.contains("/etc/lessv/certs/wildcard.example.org/current/privkey.pem"));
-        assert!(body.contains("root  /var/www/lessv-decoy;"));
+        assert!(body.contains("/etc/vela/certs/wildcard.example.org/current/fullchain.pem"));
+        assert!(body.contains("/etc/vela/certs/wildcard.example.org/current/privkey.pem"));
+        assert!(body.contains("root  /var/www/vela-decoy;"));
     }
 
     #[test]
@@ -346,7 +346,7 @@ mod tests {
         let body = render(&sample_cfg(), &[]);
         assert!(!body.contains("server {"));
         assert!(!body.contains("listen 80"));
-        assert!(body.starts_with("# Managed by lessv-node"));
+        assert!(body.starts_with("# Managed by vela-server"));
     }
 
     #[test]

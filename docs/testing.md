@@ -1,6 +1,6 @@
 # Testing this repository
 
-WHAT: every environment in which `lessv-node` and its image are exercised, what
+WHAT: every environment in which `vela-server` and its image are exercised, what
 each one proves, and what it cannot prove.
 
 WHY this file exists separately from `README.md`: the README is the operator's
@@ -8,12 +8,12 @@ manual (install, run, upgrade); this is the contributor's and releaser's manual.
 They change for different reasons and are read by different people.
 
 Not here: how the control plane is tested, provisioned, or seeded — see
-`docs/dev/testing.md` in [LessV](https://github.com/realumino/LessV). This
+`docs/dev/testing.md` in [Vela](https://github.com/realumino/LessV). This
 repository owns the node; the plane's repo owns the plane.
 
 The contract between the two (protocol number, socket path, nginx config
 directory, certificate environments) is defined in
-[`LessV docs/PROTOCOL.md`](https://github.com/realumino/LessV/blob/main/docs/PROTOCOL.md)
+[the plane's `docs/PROTOCOL.md`](https://github.com/realumino/LessV/blob/main/docs/PROTOCOL.md)
 and in code here (`PROTOCOL_VERSION` in `src/http.rs`, `DEFAULT_DECOY_SOCKET`
 and `DEFAULT_NGINX_CONF` in `src/config.rs`). **It is not restated in this
 file** — a second copy would drift from both.
@@ -68,7 +68,7 @@ process) passed every unit test and only appeared on a real host.
 
 ```sh
 VERSION=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml)
-docker build --build-arg VERSION="$VERSION" -t lessv-node:test .
+docker build --build-arg VERSION="$VERSION" -t vela-server:test .
 ```
 
 The build fails, rather than shipping, on any of:
@@ -76,7 +76,7 @@ The build fails, rather than shipping, on any of:
 1. `nginx -V` reporting OpenSSL < 3.5 (the post-quantum group requirement);
 2. `nginx -t` on the stock config (before any decoy file exists);
 3. `xray version` not matching the pinned `XRAY_VERSION`;
-4. `lessv-node version` not matching `--build-arg VERSION`;
+4. `vela-server version` not matching `--build-arg VERSION`;
 5. either binary missing or not executable.
 
 Plus, in the builder stage: `readelf -l … | grep INTERP` must find nothing.
@@ -90,7 +90,7 @@ assertion has rotted and the tag is meaningless.
 ## Tier 2 — stub plane, deterministic phases
 
 The stub answers the five node endpoints with file-backed state, using the
-response shapes of `LessV/src/routers/node.ts`:
+response shapes of `Vela/src/routers/node.ts`:
 
 ```sh
 STATE=$(mktemp -d)
@@ -101,7 +101,7 @@ python3 scripts/dev_stub_plane.py --state-dir "$STATE" --port 8080
 
 Then, for each phase, write `$STATE/state.json` and let a node converge against
 it. Enroll once (`--cp http://127.0.0.1:8080`, `--restart-mode s6`,
-`--nginx-conf-path /etc/nginx/http.d/lessv-decoy.conf`), then run the phases:
+`--nginx-conf-path /etc/nginx/http.d/vela-decoy.conf`), then run the phases:
 
 | Phase | `state.json` | Expected |
 |---|---|---|
@@ -125,11 +125,11 @@ rendering). It is for the node's behaviour, not the plane's.
 
 ## Tier 3 — the plane's own renderer
 
-With a [LessV](https://github.com/realumino/LessV) checkout:
+With a [Vela](https://github.com/realumino/LessV) checkout:
 
 ```sh
-npx wrangler d1 migrations apply DB --local --persist-to /tmp/lessv-dev
-npx wrangler dev --port 8788 --persist-to /tmp/lessv-dev --ip 0.0.0.0
+npx wrangler d1 migrations apply DB --local --persist-to /tmp/vela-dev
+npx wrangler dev --port 8788 --persist-to /tmp/vela-dev --ip 0.0.0.0
 ```
 
 Create a node and mint its token through the admin API, author a config
@@ -152,9 +152,9 @@ Before a release, on a throwaway host (a small VPS reaches the same conclusion
 as a big one):
 
 1. `docker compose up -d` with the image under test, volumes as in
-   `compose.yaml`, `network_mode: host`.
+   `compose.yaml`, `network_mode: bridge` plus `ports:`.
 2. Enroll from a second shell, token on stdin, `--restart-mode s6`,
-   `--nginx-conf-path /etc/nginx/http.d/lessv-decoy.conf`.
+   `--nginx-conf-path /etc/nginx/http.d/vela-decoy.conf`.
 3. Assert, from **outside** the host:
 
    ```sh
@@ -186,7 +186,7 @@ correctly (that is tier 3), and scale (one node is one node).
 ## What a test run needs from you
 
 The image itself holds **no credentials**. It reads one minted node token from
-stdin at enroll, writes it to `/etc/lessv/node.toml` (0600, inside a volume),
+stdin at enroll, writes it to `/etc/vela/node.toml` (0600, inside a volume),
 and from then on authenticates only with that. No Cloudflare token, no cloud
 provider key, no registry credential is ever needed or accepted by the node.
 
@@ -198,7 +198,7 @@ it is exactly as powerful as that one node's rendered config.
 | 0 | a Rust toolchain on Linux (or a container) | — |
 | 1 | Docker | — |
 | 2 | Docker + Python 3 | — (the stub plane is local; token is a literal you write) |
-| 3 | a LessV checkout + `npm install` | `.dev.vars` holds *invented* values only: `ADMIN_KEY` (32 random bytes), `KEY_SECRET` (32 random bytes), `CF_DNS_API_TOKEN` = any placeholder, because nothing reaches Cloudflare |
+| 3 | a Vela checkout + `npm install` | `.dev.vars` holds *invented* values only: `ADMIN_KEY` (32 random bytes), `KEY_SECRET` (32 random bytes), `CF_DNS_API_TOKEN` = any placeholder, because nothing reaches Cloudflare |
 | 4 | one throwaway host; optionally a GHCR read credential | node token, minted by the plane for that one node (re-mint `POST /api/admin/nodes/:id/token` to revoke the old one instantly; deleting the node revokes it too); if the package is private, a token with `read:packages` only |
 
 Sort what you handle into three buckets; if a value fits none of them, it does
@@ -229,7 +229,7 @@ production.
 
 The full table, ranked by blast radius (including `KEY_SECRET`, `ADMIN_KEY`, the
 Cloudflare zone scope and the Access service token) is in
-[`LessV docs/dev/testing.md`](https://github.com/realumino/LessV/blob/main/docs/dev/testing.md#credentials-what-actually-needs-care).
+[the plane's `docs/dev/testing.md`](https://github.com/realumino/LessV/blob/main/docs/dev/testing.md#credentials-what-actually-needs-care).
 
 ## Fidelity ladder
 

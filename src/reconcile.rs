@@ -21,7 +21,7 @@ use crate::http::{bound_error, Action, HttpError, NodeClient};
 use crate::state::{self, State};
 use crate::stats;
 use crate::supervisor::Supervisor;
-use crate::update;
+use crate::net;
 use crate::util::{now_unix, random_bytes};
 use crate::xray;
 use crate::{log_error, log_info, log_warn};
@@ -162,7 +162,6 @@ impl Runner<'_> {
         for action in actions {
             match action {
                 Action::RestartXray => self.handle_restart_action(state),
-                Action::UpdateXray(version) => self.handle_xray_update(state, &version),
                 Action::UpdateGeodata => self.handle_geodata_update(state),
                 Action::Unknown(name) => {
                     log_warn(&format!("plane asked for unknown action {name:?}; ignored"))
@@ -284,77 +283,12 @@ impl Runner<'_> {
         }
     }
 
-    /// WHAT: execute one admin-confirmed Xray binary update.
-    ///
-    /// WHY it re-reports instead of skipping when the binary already matches:
-    /// the plane only clears the action on a report, and comparing versions
-    /// first turns a repeated advertisement into a cheap round trip instead
-    /// of a fresh download.
-    fn handle_xray_update(&self, state: &mut State, requested: &str) {
-        let agent = update::download_agent();
-        let tag = match update::resolve_target(&agent, requested) {
-            Ok(tag) => tag,
-            Err(error) => {
-                log_error(&format!("xray update: {error}"));
-                self.report_action("update_xray", false, None, Some(&error));
-                return;
-            }
-        };
-        let current = self.current_xray_version();
-        if update::version_matches(&current, &tag) {
-            log_info(&format!("xray update: already on {current}"));
-            *self.xray_version.borrow_mut() = current.clone();
-            self.report_action("update_xray", true, Some(&current), None);
-            return;
-        }
-        let target = match xray::binary_path(&self.cfg.xray_binary) {
-            Ok(path) => path,
-            Err(error) => {
-                log_error(&format!("xray update: {error}"));
-                self.report_action("update_xray", false, None, Some(&error));
-                return;
-            }
-        };
-        let supervisor = self.supervisor;
-        let service = self.service().to_string();
-        let live = apply::live_path(self.cfg);
-        log_info(&format!(
-            "xray update: installing {} over {}",
-            update::version_number(&tag),
-            current
-        ));
-        let result = update::install_tag(
-            &agent,
-            &target,
-            &tag,
-            &live,
-            |binary, config| {
-                xray::test_config(&binary.to_string_lossy(), &config.to_string_lossy())
-            },
-            || supervisor.restart(&service),
-            || supervisor.status(&service).0,
-        );
-        match result {
-            Ok(version) => {
-                log_info(&format!("xray update: now running {version}"));
-                *self.xray_version.borrow_mut() = version.clone();
-                state.last_error = None;
-                self.report_action("update_xray", true, Some(&version), None);
-            }
-            Err(error) => {
-                log_error(&format!("xray update failed: {error}"));
-                state.last_error = Some(bound_error(&format!("xray update: {error}")));
-                self.report_action("update_xray", false, None, Some(&error));
-            }
-        }
-    }
-
     /// WHAT: fetch and install the latest geodata release.
     ///
     /// WHY the caller reports: an admin-triggered action has a plane row to
     /// finish; the weekly automatic refresh has none.
     fn update_geodata(&self, state: &mut State) -> Result<String, String> {
-        let agent = update::download_agent();
+        let agent = net::download_agent();
         let supervisor = self.supervisor;
         let service = self.service().to_string();
         let result = geodata::sync(
@@ -503,7 +437,7 @@ pub fn run(cfg: &Config, state_path: PathBuf, stop: &AtomicBool, verbose: bool) 
         }
     };
     log_info(&format!(
-        "lessv-node {} starting (control plane {}, node {}, init {})",
+        "vela-server {} starting (control plane {}, node {}, init {})",
         crate::http::VERSION,
         cfg.cp_url,
         cfg.node_id,

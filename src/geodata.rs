@@ -114,11 +114,11 @@ pub fn fetch_asset(
 ) -> Result<Vec<u8>, String> {
     let base =
         format!("https://github.com/{RULES_REPO}/releases/download/{tag}/{name}");
-    let compressed = crate::update::fetch(agent, &base, limit)?;
-    let sums = crate::update::fetch(agent, &format!("{base}.sha256sum"), 1 << 16)?;
+    let compressed = crate::net::fetch(agent, &base, limit)?;
+    let sums = crate::net::fetch(agent, &format!("{base}.sha256sum"), 1 << 16)?;
     let expected = parse_sha256(&String::from_utf8_lossy(&sums))
         .ok_or_else(|| format!("{name}.sha256sum: no digest"))?;
-    let actual = crate::update::sha256_hex(&compressed);
+    let actual = crate::net::sha256_hex(&compressed);
     if expected != actual {
         return Err(format!(
             "{name}: sha256 mismatch (expected {expected}, got {actual})"
@@ -214,7 +214,7 @@ pub fn sync(
     restart: impl Fn() -> Result<(), String>,
     verify: impl Fn() -> bool,
 ) -> Result<String, String> {
-    let tag = crate::update::latest_tag(agent, RULES_REPO)?;
+    let tag = crate::net::latest_tag(agent, RULES_REPO)?;
     let [geoip, geosite] = [
         fetch_asset(agent, &tag, ASSETS[0].0, DOWNLOAD_LIMIT)?,
         fetch_asset(agent, &tag, ASSETS[1].0, DOWNLOAD_LIMIT)?,

@@ -1,6 +1,6 @@
-//! `lessv-node`: node-side reconciler for LessV.
+//! `vela-server`: node-side reconciler for Vela.
 //!
-//! WHAT: `enroll` writes `/etc/lessv/node.toml` and first-contacts the plane;
+//! WHAT: `enroll` writes `/etc/vela/node.toml` and first-contacts the plane;
 //! `run` is the daemon that converges Xray, certificates, and nginx.
 //! WHY one static binary: no interpreter, no site-packages, no virtualenv —
 //! the same executable runs on glibc and musl distributions (Debian, Alpine)
@@ -11,12 +11,12 @@ mod certs;
 mod config;
 mod geodata;
 mod http;
+mod net;
 mod nginx;
 mod reconcile;
 mod state;
 mod stats;
 mod supervisor;
-mod update;
 mod util;
 mod xray;
 
@@ -48,12 +48,12 @@ pub fn log_error(message: &str) {
 
 fn usage() {
     println!(
-        "lessv-node {}\n\
+        "vela-server {}\n\
          \n\
          usage:\n\
-         \x20 lessv-node enroll --cp <control-plane-url> --node <node-id> [options]\n\
-         \x20 lessv-node run [--config <path>] [--state <path>] [--verbose]\n\
-         \x20 lessv-node version\n\
+         \x20 vela-server enroll --cp <control-plane-url> --node <node-id> [options]\n\
+         \x20 vela-server run [--config <path>] [--state <path>] [--verbose]\n\
+         \x20 vela-server version\n\
          \n\
          enroll options: --config PATH, --poll-interval N, --xray-binary PATH,\n\
          \x20 --config-path PATH, --xray-service NAME, --restart-mode systemd|openrc|s6|auto,\n\
@@ -312,7 +312,6 @@ fn cmd_run(args: &[String]) -> i32 {
     std::env::set_var("XRAY_LOCATION_ASSET", &cfg.geodata_dir);
     install_signal_handlers();
     apply::cleanup_temp_files(&cfg);
-    update::cleanup_staged(&cfg);
     geodata::cleanup_staged(&cfg);
     reconcile::run(&cfg, state_path, &STOP, flags.switch("verbose"))
 }
@@ -323,7 +322,7 @@ fn main() {
         Some("enroll") => cmd_enroll(&args[1..]),
         Some("run") => cmd_run(&args[1..]),
         Some("version") | Some("--version") | Some("-V") => {
-            println!("lessv-node {}", http::VERSION);
+            println!("vela-server {}", http::VERSION);
             0
         }
         Some("-h") | Some("--help") => {

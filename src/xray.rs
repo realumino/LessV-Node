@@ -142,11 +142,11 @@ mod tests {
 
     #[test]
     fn missing_binary_is_a_failure_not_a_panic() {
-        let (ok, code, output) = test_config("lessv-node-no-xray", "/tmp/x.json");
+        let (ok, code, output) = test_config("vela-server-no-xray", "/tmp/x.json");
         assert!(!ok);
         assert_eq!(code, 127);
         assert!(output.contains("command not found"));
-        assert_eq!(version_number(Path::new("/nonexistent/lessv-node-no-xray")), None);
+        assert_eq!(version_number(Path::new("/nonexistent/vela-server-no-xray")), None);
     }
 
     #[test]

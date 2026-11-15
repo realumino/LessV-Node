@@ -1,0 +1,17 @@
+#!/command/with-contenv sh
+# WHAT: the reconciler, held back until this node has been enrolled.
+# WHY the guard: `vela-server run` exits 2 without /etc/vela/node.toml, and s6
+# would restart it in a tight loop -- a log flood where the operator needs one
+# instruction instead. Enrolling from a second shell writes the file and this
+# service starts on its own, no restart needed.
+if [ ! -f /etc/vela/node.toml ]; then
+    echo "vela-server: /etc/vela/node.toml is missing; enroll this node first:"
+    echo "vela-server:   docker run --rm -it --entrypoint /usr/local/bin/vela-server \\"
+    echo "vela-server:     -v vela-etc:/etc/vela <this-image> enroll \\"
+    echo "vela-server:       --cp <control-plane-url> --node <node-id> \\"
+    echo "vela-server:       --restart-mode s6 --nginx-conf-path /etc/nginx/http.d/vela-decoy.conf"
+    echo "vela-server: (node token on stdin; this service starts once the file exists)"
+    while [ ! -f /etc/vela/node.toml ]; do sleep 10; done
+    echo "vela-server: /etc/vela/node.toml appeared; starting the reconciler"
+fi
+exec /usr/local/bin/vela-server run --config /etc/vela/node.toml

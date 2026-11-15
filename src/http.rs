@@ -64,7 +64,7 @@ impl NodeClient {
         let config = ureq::Agent::config_builder()
             .timeout_global(Some(Duration::from_secs(TIMEOUT_SECS)))
             .http_status_as_error(false)
-            .user_agent(format!("lessv-node/{VERSION}"))
+            .user_agent(format!("vela-server/{VERSION}"))
             .build();
         NodeClient {
             agent: ureq::Agent::new_with_config(config),
@@ -292,7 +292,6 @@ impl NodeClient {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Action {
     RestartXray,
-    UpdateXray(String),
     UpdateGeodata,
     Unknown(String),
 }
@@ -308,24 +307,24 @@ pub fn parse_actions(value: &Value) -> Result<Vec<Action>, HttpError> {
     let mut actions = Vec::new();
     for item in items {
         let named = match item {
-            Value::String(name) => Some((name.as_str(), None)),
+            Value::String(name) => Some(name.as_str()),
             Value::Object(map) => {
                 let name = map.get("action").and_then(Value::as_str).unwrap_or("");
-                let version = map.get("version").and_then(Value::as_str);
-                Some((name, version))
+                Some(name)
             }
             _ => None,
         };
-        let Some((name, version)) = named else {
+        let Some(name) = named else {
             return Err(HttpError::transport(
                 "heartbeat actions must be strings or objects",
             ));
         };
+        // WHY update_xray is not a variant any more: Xray ships inside this
+        // image, so a binary update is an image update. The plane stopped
+        // requesting it; a plane that still does gets the unknown-action path
+        // below and the node keeps converging everything else.
         actions.push(match name {
             "restart_xray" => Action::RestartXray,
-            "update_xray" => Action::UpdateXray(
-                version.unwrap_or("latest").to_string(),
-            ),
             "update_geodata" => Action::UpdateGeodata,
             other => Action::Unknown(other.to_string()),
         });
@@ -358,21 +357,21 @@ mod tests {
     #[test]
     fn parses_action_objects_and_legacy_strings() {
         let actions = parse_actions(&serde_json::json!([
-            {"action": "update_xray", "version": "v26.11.9"},
             {"action": "update_geodata"},
             {"action": "restart_xray"},
             "restart_xray",
-            {"action": "something_new"}
+            {"action": "something_new"},
+            {"action": "update_xray", "version": "v26.11.9"}
         ]))
         .unwrap();
         assert_eq!(
             actions,
             vec![
-                Action::UpdateXray("v26.11.9".to_string()),
                 Action::UpdateGeodata,
                 Action::RestartXray,
                 Action::RestartXray,
                 Action::Unknown("something_new".to_string()),
+                Action::Unknown("update_xray".to_string()),
             ]
         );
         assert!(parse_actions(&serde_json::json!({})).is_err());

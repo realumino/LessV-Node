@@ -7,5 +7,5 @@
 # WHY the wait: `xray run -config <missing>` exits immediately, and s6 restarts
 # a dead longrun at once -- a fresh node would spin (and log) for as long as
 # enrollment takes. The file appearing is the start signal.
-while [ ! -f /var/lib/lessv/config.json ]; do sleep 5; done
-exec /usr/local/bin/xray run -config /var/lib/lessv/config.json
+while [ ! -f /var/lib/vela/config.json ]; do sleep 5; done
+exec /usr/local/bin/xray run -config /var/lib/vela/config.json

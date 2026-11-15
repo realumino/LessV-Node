@@ -1,15 +1,15 @@
 #!/sbin/openrc-run
-# Xray under OpenRC (Alpine), managed by lessv-node.
+# Xray under OpenRC (Alpine), managed by vela-server.
 #
 # WHY supervise-daemon: the reconciler restarts Xray through
 # `rc-service xray restart`, and supervise-daemon both reparents the process
 # and writes /run/xray.pid, which the node reports in its heartbeat.
-description="Xray Service (managed by lessv-node)"
+description="Xray Service (managed by vela-server)"
 supervisor="supervise-daemon"
-# GeoIP/GeoSite data managed by lessv-node (routing rules name geoip:/geosite:).
-export XRAY_LOCATION_ASSET=/var/lib/lessv/assets
+# GeoIP/GeoSite data managed by vela-server (routing rules name geoip:/geosite:).
+export XRAY_LOCATION_ASSET=/var/lib/vela/assets
 command="/usr/local/bin/xray"
-command_args="run -config /var/lib/lessv/config.json"
+command_args="run -config /var/lib/vela/config.json"
 command_user="root:root"
 pidfile="/run/xray.pid"
 output_log="/var/log/xray.log"
