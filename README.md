@@ -130,9 +130,9 @@ directory.
 - it behaves the same on every provider and needs nothing but Docker;
 - 80/443 are the only ports the host has to expose — the one hard requirement;
 - the cost is source addresses: Xray and the decoy see the docker gateway, and
-  `detected_ip` reports the container's private address. The plane ignores a
-  private literal and shows the address the node reached it from instead, so
-  the fleet view stays correct.
+  a peer's address in the logs is the bridge's. The plane does not track a
+  reported address at all — the fleet view answers "when did it last report"
+  from the heartbeat.
 
 If you want the client's real source address to reach Xray and the decoy, use
 host networking instead: drop `network_mode` and `ports:` and set

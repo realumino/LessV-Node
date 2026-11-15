@@ -256,7 +256,6 @@ fn cmd_enroll(args: &[String]) -> i32 {
             .and_then(|path| xray::version_number(&path))
             .unwrap_or_else(|| "unknown".to_string()),
         "platform": xray::platform(),
-        "detected_ip": xray::detected_ip(),
     });
     match client.enroll(&info) {
         Ok(meta) => {
