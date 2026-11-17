@@ -130,13 +130,6 @@ RUN apk add --no-cache "nginx=${NGINX_VERSION}" \
       /etc/nginx/nginx.conf \
  && grep -q '^error_log /dev/stderr warn;' /etc/nginx/nginx.conf \
  && grep -q 'access_log /dev/stdout main;' /etc/nginx/nginx.conf
- && rm -rf /var/www/localhost \
- && sed -i \
-      -e 's#^error_log /var/log/nginx/error.log warn;#error_log /dev/stderr warn;#' \
-      -e 's#^\([[:space:]]*\)access_log /var/log/nginx/access.log main;#\1access_log /dev/stdout main;#' \
-      /etc/nginx/nginx.conf \
- && grep -q '^error_log /dev/stderr warn;' /etc/nginx/nginx.conf \
- && grep -q 'access_log /dev/stdout main;' /etc/nginx/nginx.conf
 
 # The s6 supervision tree, the two binaries, and the three service definitions.
 COPY --from=fetch /out/s6/ /
