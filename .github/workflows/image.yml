@@ -94,7 +94,7 @@ jobs:
                   exit 1
                   ;;
               esac
-              if ! printf %s "$tag_version" | grep -qE '^[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?$'; then
+              if ! printf %s "$tag_version" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'; then
                 echo "tag v$tag_version is not strict SemVer (X.Y.Z or X.Y.Z-<pre-release>, no +)" >&2
                 exit 1
               fi
