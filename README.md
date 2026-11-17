@@ -51,9 +51,25 @@ component that parses remote-supplied configuration.
 | Environment | none required (`XRAY_LOCATION_ASSET` is preset) |
 | Token input | stdin only — never argv, never the environment |
 
-`<version>` is the crate version (`Cargo.toml`), and `vela-server version` run
-from the image prints it; the release workflow refuses a `vela-server-v*` tag that
-disagrees.
+`<version>` is the release version, carried by `Cargo.toml` for the crate and
+the image together, and `vela-server version` run from the image prints it;
+the release workflow refuses a `v<version>` tag that disagrees or is not strict
+SemVer (`X.Y.Z` or `X.Y.Z-<pre-release>`, no build metadata — a `+` cannot
+appear in an image tag). Pre-releases publish `<version>` and `sha-<short>`
+and never move `latest`.
+
+The image is the release unit, so the version belongs to it, not to the crate:
+
+| Bump | Reason |
+|---|---|
+| MAJOR | protocol or data-format break: an old plane cannot talk to the new server, or a plane migration is irreversible |
+| MINOR | backwards-compatible capability: a new endpoint, a new optional field |
+| PATCH | contents only: bug fix, Xray bump, nginx bump, base image change |
+
+Any change to image contents bumps at least PATCH — an nginx-only update is a
+new tag, never the same number on a different artifact. The components inside
+are recorded by `org.opencontainers.image.revision`, the job summary, and
+`/usr/share/vela/components.txt`, not by the tag.
 
 ---
 
@@ -225,7 +241,7 @@ The build asserts, and fails rather than shipping a broken node:
 
 - every push to `main` and every PR builds (no publish) so Dockerfile rot is
   caught early;
-- pushing a `vela-server-v<version>` tag tests, verifies the tag against
+- pushing a `v<version>` tag tests, verifies the tag against
   `Cargo.toml`
   and the Dockerfile's `XRAY_VERSION`, builds each architecture on its own
   native runner (`ubuntu-24.04`, `ubuntu-24.04-arm`), and merges the two

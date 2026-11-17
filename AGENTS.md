@@ -47,9 +47,12 @@ Cross-repo rules:
   repository, same intent: the crate version is the third value of the plane's
   protocol invariant, and a protocol bump that lands on one side only is a
   broken release.
-- A crate version bump on its own is a release, not a protocol change: it
-  needs no plane-side commit, but the `vela-server-v<version>` tag, the image's
-  `<version>` tag, and `Cargo.toml` must agree.
+- A version bump on its own is a release, not a protocol change: it needs no
+  plane-side commit, but the `v<version>` tag, the image's `<version>` tag, and
+  `Cargo.toml` must agree. The version is the image's, not only the crate's:
+  MAJOR is a protocol or data-format break, MINOR an additive capability, and
+  any change to image contents (an Xray or nginx bump, a base image change)
+  bumps at least PATCH, so two images never share one tag.
 - Constants owned by the plane are mirrored in code here, never redefined: the
   decoy socket path and nginx config defaults (`src/config.rs`), the protocol
   number, the `X-Vela-Server` identity header, the certificate environments.
@@ -150,8 +153,8 @@ docker build --build-arg VERSION="$VERSION" -t vela-server:test .
   gets a regression test in the same commit; a defect in the image or the
   supervised processes belongs in a tier 2 phase, not only a unit test.
 - CI runs tier 0 plus the s6 shebang guard and tier 1 for both architectures
-  on every push and PR; only a `vela-server-v*` tag publishes, and the tag must
-  match `Cargo.toml`.
+  on every push and PR; only a `v*` tag publishes, and the tag must match
+  `Cargo.toml`.
 
 ## Standing invariants
 

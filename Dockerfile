@@ -14,8 +14,14 @@
 # Every assertion below fails the build rather than the first certificate sync.
 # Logs go to stdout/stderr; there is no log file and no logrotate.
 
+# Single source of truth for every component version, in one place: the
+# stage-local re-declarations below inherit these, so a component bump is one
+# line and the version recorded in /usr/share/vela/components.txt cannot drift
+# from the one actually downloaded.
 ARG ALPINE_IMAGE=alpine:3.24
 ARG RUST_IMAGE=rust:1.99-alpine3.24
+ARG XRAY_VERSION=v26.11.9
+ARG S6_OVERLAY_VERSION=3.2.3.2
 
 # --------------------------------------------------------------------- builder
 FROM ${RUST_IMAGE} AS builder
@@ -42,8 +48,8 @@ RUN cargo build --locked --release \
 FROM ${ALPINE_IMAGE} AS fetch
 
 ARG TARGETARCH
-ARG XRAY_VERSION=v26.11.9
-ARG S6_OVERLAY_VERSION=3.2.3.2
+ARG XRAY_VERSION
+ARG S6_OVERLAY_VERSION
 
 RUN apk add --no-cache curl unzip xz
 RUN set -eu; \
@@ -82,13 +88,19 @@ RUN set -eu; \
 FROM ${ALPINE_IMAGE} AS runtime
 
 ARG VERSION
-ARG XRAY_VERSION=v26.11.9
+ARG REVISION
+ARG XRAY_VERSION
+ARG S6_OVERLAY_VERSION
+ARG NGINX_VERSION=1.30.6-r0
+ARG ALPINE_IMAGE
+ARG RUST_IMAGE
 
 LABEL org.opencontainers.image.title="vela-server" \
       org.opencontainers.image.description="Vela node reconciler with Xray, the nginx decoy, and s6 supervision" \
       org.opencontainers.image.source="https://github.com/realumino/vela-server" \
       org.opencontainers.image.licenses="AGPL-3.0-or-later" \
-      org.opencontainers.image.version="${VERSION}"
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.revision="${REVISION}"
 
 # The unit files export this for the Xray service. s6-rc longruns get a minimal
 # environment, not the image's, so the run scripts start with
@@ -104,8 +116,20 @@ ENV XRAY_LOCATION_ASSET=/var/lib/vela/assets
 # own timeout-kill, so nothing needs the sweep to be patient.
 ENV S6_KILL_GRACETIME=0
 
-RUN apk add --no-cache nginx \
+# nginx is pinned to the exact Alpine package build (`apk add nginx=<version>`),
+# not left to float with the repository index: the same image version must mean
+# the same nginx, and a moved package build fails the build loudly instead of
+# quietly shipping into the next tag. NGINX_VERSION must match a real package
+# in the ${ALPINE_IMAGE} repositories for both architectures.
+RUN apk add --no-cache "nginx=${NGINX_VERSION}" \
  && rm -f /etc/nginx/http.d/default.conf \
+ && rm -rf /var/www/localhost \
+ && sed -i \
+      -e 's#^error_log /var/log/nginx/error.log warn;#error_log /dev/stderr warn;#' \
+      -e 's#^\([[:space:]]*\)access_log /var/log/nginx/access.log main;#\1access_log /dev/stdout main;#' \
+      /etc/nginx/nginx.conf \
+ && grep -q '^error_log /dev/stderr warn;' /etc/nginx/nginx.conf \
+ && grep -q 'access_log /dev/stdout main;' /etc/nginx/nginx.conf
  && rm -rf /var/www/localhost \
  && sed -i \
       -e 's#^error_log /var/log/nginx/error.log warn;#error_log /dev/stderr warn;#' \
@@ -144,6 +168,24 @@ RUN [ "$(/usr/local/bin/vela-server version)" = "vela-server ${VERSION}" ]
 # Assertion 5: both entry points exist and are executable (the node binary's
 # static-ness was asserted in the builder, next to the build that produced it).
 RUN test -x /usr/local/bin/vela-server && test -x /usr/local/bin/xray
+
+# The component record shipped inside the image: one line per component, from
+# the versions the assertions above have already verified. The workflow's job
+# summary lists the same components read from the same ARGs, so a release run
+# answers "what is inside" without pulling the image.
+RUN set -eu; \
+    mkdir -p /usr/share/vela; \
+    { \
+      echo "vela-server ${VERSION}"; \
+      echo "xray ${XRAY_VERSION#v}"; \
+      echo "nginx $(nginx -v 2>&1 | sed 's/^.*nginx\///')"; \
+      echo "s6-overlay ${S6_OVERLAY_VERSION}"; \
+      echo "alpine ${ALPINE_IMAGE#alpine:}"; \
+      echo "builder ${RUST_IMAGE#rust:}"; \
+    } > /usr/share/vela/components.txt; \
+    [ "$(wc -l < /usr/share/vela/components.txt)" -eq 6 ] \
+      || { echo "components.txt is incomplete" >&2; exit 1; }; \
+    cat /usr/share/vela/components.txt
 
 # Documentation only: with host networking nothing is published.
 EXPOSE 80 443

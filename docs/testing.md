@@ -261,7 +261,7 @@ When building a test environment, match these or expect false confidence:
 | `cargo test`, musl release build | `.github/workflows/image.yml`, job `test` | 0 |
 | s6 run-script shebang guard | same job | 1 |
 | image build (both architectures) + the five assertions | jobs `build (amd64/arm64)` | 1 |
-| publish + multi-arch index assertion | job `merge`, on `vela-server-v*` tags | 1 |
+| publish + multi-arch index assertion | job `merge`, on `v*` tags | 1 |
 | tiers 2–4 | **manual**; recorded in the release notes | 2–4 |
 
 Promoting tier 2 into CI is the obvious next step: it needs only Docker and
