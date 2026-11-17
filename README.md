@@ -1,6 +1,6 @@
 # vela-server
 
-The node side of [Vela](https://github.com/realumino/LessV): a static Rust
+The node side of [Vela](https://github.com/realumino/Vela): a static Rust
 reconciler that pulls its desired state from the control plane and converges
 Xray, the certificate tree, and the nginx decoy inside one container.
 
@@ -14,7 +14,7 @@ serves traffic, and its only job is to make the host match the plane.
 
 The pull protocol (endpoints, payloads, the `bearer-v1` token rules) is defined
 by the control plane and lives in
-[the plane's `docs/PROTOCOL.md`](https://github.com/realumino/LessV/blob/main/docs/PROTOCOL.md);
+[the plane's `docs/PROTOCOL.md`](https://github.com/realumino/Vela/blob/main/docs/PROTOCOL.md);
 this repository implements it, it does not own it.
 
 ---

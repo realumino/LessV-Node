@@ -86,7 +86,7 @@ ARG XRAY_VERSION=v26.11.9
 
 LABEL org.opencontainers.image.title="vela-server" \
       org.opencontainers.image.description="Vela node reconciler with Xray, the nginx decoy, and s6 supervision" \
-      org.opencontainers.image.source="https://github.com/realumino/Vela-Node" \
+      org.opencontainers.image.source="https://github.com/realumino/vela-server" \
       org.opencontainers.image.licenses="AGPL-3.0-or-later" \
       org.opencontainers.image.version="${VERSION}"
 

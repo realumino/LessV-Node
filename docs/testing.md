@@ -8,12 +8,12 @@ manual (install, run, upgrade); this is the contributor's and releaser's manual.
 They change for different reasons and are read by different people.
 
 Not here: how the control plane is tested, provisioned, or seeded — see
-`docs/dev/testing.md` in [Vela](https://github.com/realumino/LessV). This
+`docs/dev/testing.md` in [Vela](https://github.com/realumino/Vela). This
 repository owns the node; the plane's repo owns the plane.
 
 The contract between the two (protocol number, socket path, nginx config
 directory, certificate environments) is defined in
-[the plane's `docs/PROTOCOL.md`](https://github.com/realumino/LessV/blob/main/docs/PROTOCOL.md)
+[the plane's `docs/PROTOCOL.md`](https://github.com/realumino/Vela/blob/main/docs/PROTOCOL.md)
 and in code here (`PROTOCOL_VERSION` in `src/http.rs`, `DEFAULT_DECOY_SOCKET`
 and `DEFAULT_NGINX_CONF` in `src/config.rs`). **It is not restated in this
 file** — a second copy would drift from both.
@@ -125,7 +125,7 @@ rendering). It is for the node's behaviour, not the plane's.
 
 ## Tier 3 — the plane's own renderer
 
-With a [Vela](https://github.com/realumino/LessV) checkout:
+With a [Vela](https://github.com/realumino/Vela) checkout:
 
 ```sh
 npx wrangler d1 migrations apply DB --local --persist-to /tmp/vela-dev
@@ -229,7 +229,7 @@ production.
 
 The full table, ranked by blast radius (including `KEY_SECRET`, `ADMIN_KEY`, the
 Cloudflare zone scope and the Access service token) is in
-[the plane's `docs/dev/testing.md`](https://github.com/realumino/LessV/blob/main/docs/dev/testing.md#credentials-what-actually-needs-care).
+[the plane's `docs/dev/testing.md`](https://github.com/realumino/Vela/blob/main/docs/dev/testing.md#credentials-what-actually-needs-care).
 
 ## Fidelity ladder
 

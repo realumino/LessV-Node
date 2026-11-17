@@ -15,7 +15,7 @@ not the crate; Docker or any OCI runtime is the only supported way to run it.
 The node is a reconciler, not a proxy: it holds no listener of its own, never
 serves traffic, and its only job is to make the host match the plane. It owns
 no wire format — the pull contract belongs to the plane and lives in
-[LessV's `docs/PROTOCOL.md`](https://github.com/realumino/LessV/blob/main/docs/PROTOCOL.md);
+[LessV's `docs/PROTOCOL.md`](https://github.com/realumino/Vela/blob/main/docs/PROTOCOL.md);
 this tree implements it, it does not define it.
 
 Entry docs, in order: `README.md` (operator manual: enroll, run, upgrade,
@@ -30,7 +30,7 @@ as the change.
 The project is two public repositories and neither is complete without the
 other:
 
-- **[LessV](https://github.com/realumino/LessV)** — the control plane:
+- **[LessV](https://github.com/realumino/Vela)** — the control plane:
   Cloudflare Workers + D1 + Workflows, admin SPA at `/admin`, config
   rendering, certificate issuance, node provisioning. It owns the pull
   contract, the wire field names, and every constant a node must obey.
