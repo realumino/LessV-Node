@@ -45,6 +45,19 @@ pub fn compute_backoff(attempt: u32) -> u64 {
     (delay + fraction * jitter_cap) as u64
 }
 
+/// WHAT: update the remembered plane protocol; Some(protocol) when the
+/// observation is new information (a log line is due).
+///
+/// WHY a pure function: the runner holds the memory, but the rule — log the
+/// first sighting and every change, never the repeats — is testable without
+/// a runner.
+fn observe_protocol(previous: Option<u64>, observed: Option<u64>) -> Option<u64> {
+    match observed {
+        Some(protocol) if Some(protocol) != previous => Some(protocol),
+        _ => None,
+    }
+}
+
 /// WHAT: does this heartbeat require an apply?
 ///
 /// WHY not hash equality alone: a failed last apply means the node runs
@@ -66,6 +79,10 @@ pub struct Runner<'a> {
     /// update. A `RefCell` (the loop is single-threaded) keeps the reported
     /// fact current without spawning `xray version` on every 30s poll.
     pub xray_version: RefCell<String>,
+    /// The protocol the plane last said it speaks, None until one heartbeat
+    /// names it. The skew log reads it: this memory is what makes "on
+    /// change" one line per change instead of one per poll.
+    pub plane_protocol: RefCell<Option<u64>>,
 }
 
 impl Runner<'_> {
@@ -83,6 +100,20 @@ impl Runner<'_> {
                 "cannot write state {}: {error}",
                 self.state_path.display()
             ));
+        }
+    }
+
+    /// WHAT: remember the plane's protocol and log it when it changes.
+    ///
+    /// WHY on change only: the heartbeat is a 30s poll, and repeating the
+    /// fact every poll would bury the interesting line. The first sighting
+    /// names the plane's contract in the log; a change means the plane just
+    /// moved — exactly when the operator wants to know.
+    fn observe_plane_protocol(&self, observed: Option<u64>) {
+        let previous = *self.plane_protocol.borrow();
+        if let Some(protocol) = observe_protocol(previous, observed) {
+            log_info(&format!("control plane speaks protocol {protocol}"));
+            *self.plane_protocol.borrow_mut() = Some(protocol);
         }
     }
 
@@ -161,9 +192,10 @@ impl Runner<'_> {
             "geodata_version": state.geodata_version,
             "last_error": state.last_error,
         });
-        let (desired, actions) = self.client.heartbeat(&heartbeat)?;
+        let reply = self.client.heartbeat(&heartbeat)?;
+        self.observe_plane_protocol(reply.plane_protocol);
 
-        for action in actions {
+        for action in reply.actions {
             match action {
                 Action::RestartXray => self.handle_restart_action(state),
                 Action::UpdateGeodata => self.handle_geodata_update(state),
@@ -174,8 +206,8 @@ impl Runner<'_> {
         }
         self.auto_geodata(state);
 
-        if needs_apply(state, desired.as_deref()) {
-            let hash = desired.unwrap_or_default();
+        if needs_apply(state, reply.desired_hash.as_deref()) {
+            let hash = reply.desired_hash.unwrap_or_default();
             self.apply_desired(state, &hash);
         }
         self.sync_certificates(state);
@@ -404,12 +436,25 @@ impl Runner<'_> {
                     self.cfg.poll_interval
                 }
                 Err(error) => {
-                    log_warn(&format!("heartbeat failed: {error}"));
-                    if error.auth_failed {
-                        log_error("token rejected; keeping serving, backing off hard");
-                        failures = (failures + 2).max(4);
-                    } else {
+                    if error.protocol_refused {
+                        // WHY ERROR and the plane's own sentence: a protocol
+                        // refusal means exactly one side is too old, and the
+                        // plane's detail names it — the operator must see
+                        // which side to upgrade, not a generic heartbeat
+                        // failure. Backoff is unchanged: keep serving, keep
+                        // retrying, and let a plane upgrade fix it in place.
+                        log_error(&format!(
+                            "plane refused this server's protocol: {error}"
+                        ));
                         failures += 1;
+                    } else {
+                        log_warn(&format!("heartbeat failed: {error}"));
+                        if error.auth_failed {
+                            log_error("token rejected; keeping serving, backing off hard");
+                            failures = (failures + 2).max(4);
+                        } else {
+                            failures += 1;
+                        }
                     }
                     self.maybe_start_last_good(&mut state);
                     compute_backoff(failures)
@@ -452,6 +497,7 @@ pub fn run(cfg: &Config, state_path: PathBuf, stop: &AtomicBool, verbose: bool) 
         state_path,
         stop,
         xray_version: RefCell::new(xray_version),
+        plane_protocol: RefCell::new(None),
     };
     let mut state = state::load(&runner.state_path);
     runner.startup(&mut state);
@@ -510,6 +556,17 @@ mod tests {
         assert!(!needs_apply(&state, Some("h1")));
         state.last_apply_ok = false;
         assert!(needs_apply(&state, Some("h1")));
+    }
+
+    #[test]
+    fn plane_protocol_is_logged_on_change_only() {
+        // First sighting is a change (the log names the plane's contract);
+        // repeats are not; a change is; silence stays silence.
+        assert_eq!(observe_protocol(None, Some(3)), Some(3));
+        assert_eq!(observe_protocol(Some(3), Some(3)), None);
+        assert_eq!(observe_protocol(Some(3), Some(4)), Some(4));
+        assert_eq!(observe_protocol(Some(3), None), None);
+        assert_eq!(observe_protocol(None, None), None);
     }
 
     #[test]

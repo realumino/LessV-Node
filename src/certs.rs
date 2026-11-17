@@ -694,6 +694,33 @@ mod tests {
     }
 
     #[test]
+    fn manifest_tolerates_unknown_fields() {
+        // WHY: the plane may add fields in any release (every response now
+        // names the plane's protocol); the tolerant-reader rule is that the
+        // node validates what it understands and ignores the rest — pinned
+        // so a future parse refactor cannot quietly reintroduce a strict
+        // reader.
+        let payload = json!({
+            "etag": format!("\"{}\"", "a".repeat(64)),
+            "protocol": 3,
+            "a_future_field": {"nested": true},
+            "certs": [ json!({
+                "domain": "example.org",
+                "path": "example.org",
+                "fingerprint_sha256": "a".repeat(64),
+                "not_after": "2027-01-01T00:00:00Z",
+                "profile": "tlsserver",
+                "fullchain_pem": "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\n",
+                "private_key_pem": "-----BEGIN PRIVATE KEY-----\nMIIB\n-----END PRIVATE KEY-----\n",
+                "another_future_field": 42,
+            })],
+        });
+        let parsed = parse_manifest(&payload).unwrap();
+        assert_eq!(parsed.certs.len(), 1);
+        assert_eq!(parsed.certs[0].domain, "example.org");
+    }
+
+    #[test]
     fn rejects_unsafe_paths_and_bad_fingerprints() {
         for bad in ["../x", "/abs", "a/b", "*.example.org", ".hidden", "UPPER", ""] {
             assert!(
