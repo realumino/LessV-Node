@@ -121,6 +121,11 @@ The remote is public. The tracked tree carries current truth only:
   scripts, `scripts/`, non-trivial modules) carry a WHAT/WHY header.
 - The wire contract is linked, never restated. A second copy of the protocol
   drifts from the plane's `docs/PROTOCOL.md` without anyone noticing.
+- The server is never ahead of the plane: a protocol upgrade ships the new
+  plane first, and only a plane that speaks the higher number may raise the
+  crate's. On a protocol refusal the server logs the plane's error and keeps
+  serving its current config; it never guesses a wire shape it has not
+  shipped.
 - The operator tables in `README.md` (image surface, ports, volumes, tags,
   troubleshooting) are a contract with whoever runs a node; change them with
   the code that backs them.

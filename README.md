@@ -15,7 +15,10 @@ serves traffic, and its only job is to make the host match the plane.
 The pull protocol (endpoints, payloads, the `bearer-v1` token rules) is defined
 by the control plane and lives in
 [the plane's `docs/PROTOCOL.md`](https://github.com/realumino/Vela/blob/main/docs/PROTOCOL.md);
-this repository implements it, it does not own it.
+this repository implements it, it does not own it. The plane is upgraded
+first, and the server never speaks a protocol the plane has not adopted: when
+the plane refuses a request on protocol grounds, the server logs the reason
+and keeps serving its current config.
 
 ---
 
