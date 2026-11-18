@@ -143,8 +143,9 @@ validation, merge order, and defaults included — at the cost of needing the
 other repository.
 
 Ceiling: no real certificates. Issuance from a local dev Worker would call real
-ACME and real DNS; keep `CF_DNS_API_TOKEN` a placeholder locally and expect an
-empty certificate manifest. Certificate sync is proved at tier 4.
+ACME and real DNS; leave the panel's DNS credential unset locally and expect an
+empty certificate manifest (`no DNS credential configured`). Certificate sync
+is proved at tier 4.
 
 ## Tier 4 — a public host with real ports
 
@@ -198,7 +199,7 @@ it is exactly as powerful as that one node's rendered config.
 | 0 | a Rust toolchain on Linux (or a container) | — |
 | 1 | Docker | — |
 | 2 | Docker + Python 3 | — (the stub plane is local; token is a literal you write) |
-| 3 | a Vela checkout + `npm install` | `.dev.vars` holds *invented* values only: `ADMIN_KEY` (32 random bytes), `KEY_SECRET` (32 random bytes), `CF_DNS_API_TOKEN` = any placeholder, because nothing reaches Cloudflare |
+| 3 | a Vela checkout + `npm install` | `.dev.vars` holds one *invented* value: `KEY_SECRET` (32 random bytes). Panel admin keys and the DNS token are D1 rows the panel or `scripts/admin_key.mjs` creates, not values in that file — mint the first key before the local API answers |
 | 4 | one throwaway host; optionally a GHCR read credential | node token, minted by the plane for that one node (re-mint `POST /api/admin/nodes/:id/token` to revoke the old one instantly; deleting the node revokes it too); if the package is private, a token with `read:packages` only |
 
 Sort what you handle into three buckets; if a value fits none of them, it does
@@ -227,9 +228,9 @@ one node's rendered config, which includes that node's REALITY private key.
 Treat it as that node's root password, and never lift one from a test run into
 production.
 
-The full table, ranked by blast radius (including `KEY_SECRET`, `ADMIN_KEY`, the
-Cloudflare zone scope and the Access service token) is in
-[the plane's `docs/dev/testing.md`](https://github.com/realumino/Vela/blob/main/docs/dev/testing.md#credentials-what-actually-needs-care).
+The full table, ranked by blast radius (including `KEY_SECRET`, panel admin
+keys, the Cloudflare zone scope and the Access service token) is in
+[the plane's `docs/dev/testing.md`](https://github.com/realumino/LessV/blob/main/docs/dev/testing.md#credentials-what-actually-needs-care).
 
 ## Fidelity ladder
 

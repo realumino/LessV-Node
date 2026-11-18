@@ -163,11 +163,12 @@ docker build --build-arg VERSION="$VERSION" -t vela-server:test .
 
 ## Standing invariants
 
-- Never commit or print credentials: the node token, plane-side secrets
-  (`ADMIN_KEY`, `KEY_SECRET`, `CF_DNS_API_TOKEN`), provider tokens, VLESS
-  URIs/uuids, REALITY and certificate private keys. The token enters on stdin
-  at enroll only — never argv, never the environment (both are readable from
-  `ps` and shell history) — is stored 0600, and is never logged.
+- Never commit or print credentials: the node token, the plane's `KEY_SECRET`
+  and its runtime credential rows (panel admin keys, the DNS API token),
+  provider tokens, VLESS URIs/uuids, REALITY and certificate private keys. The
+  token enters on stdin at enroll only — never argv, never the environment
+  (both are readable from `ps` and shell history) — is stored 0600, and is
+  never logged.
 - One image, three processes, one identity (one token, one applied hash, one
   certificate manifest). Never split container. A separate nginx/Xray
   container would need the Docker socket inside it, which is host-root
