@@ -268,3 +268,51 @@ When building a test environment, match these or expect false confidence:
 Promoting tier 2 into CI is the obvious next step: it needs only Docker and
 Python, and it is the only automated check that exercises the supervised
 processes at all.
+
+---
+
+## Releasing
+
+`meta` sets `publishing` only for a `refs/tags/v<version>` ref. A push to `main`
+builds and verifies and never pushes — its `merge` job is skipped, which is the
+tell that nothing shipped. The tag is the trigger; the GitHub Release is the
+record, written afterwards.
+
+```sh
+version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n 1)
+git switch main && git pull --ff-only
+git tag -a "v$version" -m "vela-server $version"
+git push origin "v$version"
+gh run list --branch "v$version" --limit 1   # the tag run, created seconds after the push
+gh run watch --exit-status <run-id>          # test -> build amd64+arm64 -> merge
+
+gh release create "v$version" --verify-tag --title "$version" --notes-file - <<EOF
+Image:  ghcr.io/realumino/vela-server:$version  (tags: $version, latest, sha-<short>)
+Change: <what moved since the previous version>
+Tiers:  <2-4 that ran for this image, or "not run">
+EOF
+```
+
+Rules the sequence encodes:
+
+- **`v<version>` must equal `Cargo.toml`.** `meta` refuses a tag that disagrees,
+  is not strict SemVer, or carries build metadata (`+` cannot appear in an image
+  tag). A pre-release tag (`v0.7.2-rc.1`) publishes `<version>` and `sha-<short>`
+  and leaves `latest` alone.
+- **Tag first, release object second — never the reverse.** `--verify-tag` makes
+  `gh release create` abort instead of creating a new tag at `main` HEAD, which
+  would publish a different commit under a version that is already taken. A
+  release created for an existing tag triggers no workflow, so the record cannot
+  publish twice; created first, it is public before any image exists.
+- **A published version is permanent.** `merge` refuses to overwrite an existing
+  `$IMAGE:$VERSION`; GHCR tags are mutable, so that guard is the only
+  immutability there is. Never delete and re-push a tag whose image exists.
+- **A failed tag run published nothing**, because the push happens only after
+  both architectures build. Recovery: `git push --delete origin "v$version"`,
+  `git tag -d "v$version"`, fix, bump at least PATCH, repeat from the top.
+- **Check the index, not the tag.** `merge` asserts `linux/amd64` and
+  `linux/arm64` are both in it; to see it yourself:
+  `docker buildx imagetools inspect ghcr.io/realumino/vela-server:<version>`.
+- **Record the manual tiers.** The release notes say which of tiers 2–4 ran for
+  this image; a version released without them says so rather than leaving it
+  open. The one-time GHCR visibility flip is in `README.md` → Automation.

@@ -52,7 +52,9 @@ Cross-repo rules:
   `Cargo.toml` must agree. The version is the image's, not only the crate's:
   MAJOR is a protocol or data-format break, MINOR an additive capability, and
   any change to image contents (an Xray or nginx bump, a base image change)
-  bumps at least PATCH, so two images never share one tag.
+  bumps at least PATCH, so two images never share one tag. The release sequence
+  — tag, watch, release object, in that order — is `docs/testing.md` →
+  Releasing; the tag is the publish trigger and the release is its record.
 - Constants owned by the plane are mirrored in code here, never redefined: the
   decoy socket path and nginx config defaults (`src/config.rs`), the protocol
   number, the `X-Vela-Server` identity header, the certificate environments.

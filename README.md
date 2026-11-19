@@ -249,7 +249,10 @@ The build asserts, and fails rather than shipping a broken node:
   and the Dockerfile's `XRAY_VERSION`, builds each architecture on its own
   native runner (`ubuntu-24.04`, `ubuntu-24.04-arm`), and merges the two
   digests into one index with tags `<version>`, `latest`, `sha-<short>`;
-- GHCR authentication uses `GITHUB_TOKEN`; no stored secret.
+- GHCR authentication uses `GITHUB_TOKEN`; no stored secret;
+- the GitHub Release is written after that run is green: the tag is the publish
+  trigger, the release is the record. `docs/testing.md` → Releasing has the
+  commands and the rules around them.
 
 One manual step after the very first publish: GitHub creates the GHCR package as
 **private**. Flip it to public once in the package settings (Package settings →
