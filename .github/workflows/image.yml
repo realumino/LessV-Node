@@ -11,11 +11,14 @@
 #
 # WHY the tag is `v<version>` and the version is the image's, not the crate's:
 # the image is the release unit — vela-server, Xray, nginx, and s6-overlay —
-# so its version moves whenever any component does (at least PATCH for a
-# contents-only change; MAJOR for a protocol or data-format break). The tag
-# then identifies exactly one artifact: `<version>` and `sha-<short>` always;
-# `latest` only for a non-pre-release. Strict SemVer only — build metadata
-# (`+`) cannot appear in an image tag, so it is refused before anything ships.
+# and the version is its UTC ship date (`YY.M.D`, month and day never
+# zero-padded: Cargo's semver rejects `26.03.05`, so the tag is the Cargo
+# string with a `v`). The date identifies exactly one artifact — one release
+# per date, a same-day respin takes the next date — and never classifies the
+# change: a protocol or data-format break is named by `PROTOCOL_VERSION` and
+# the release notes. Tags: `<version>` and `sha-<short>` always; `latest` only
+# for a non-pre-release. Strict SemVer grammar only — build metadata (`+`)
+# cannot appear in an image tag, so it is refused before anything ships.
 name: image
 
 on:

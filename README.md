@@ -61,17 +61,16 @@ SemVer (`X.Y.Z` or `X.Y.Z-<pre-release>`, no build metadata — a `+` cannot
 appear in an image tag). Pre-releases publish `<version>` and `sha-<short>`
 and never move `latest`.
 
-The image is the release unit, so the version belongs to it, not to the crate:
+The image is the release unit, so the version belongs to it, not to the
+crate — and it is the UTC ship date, `YY.M.D` with month and day never
+zero-padded (Cargo's semver rejects `26.03.05`, so the tag is the Cargo
+string with a `v`).
 
-| Bump | Reason |
-|---|---|
-| MAJOR | protocol or data-format break: an old plane cannot talk to the new server, or a plane migration is irreversible |
-| MINOR | backwards-compatible capability: a new endpoint, a new optional field |
-| PATCH | contents only: bug fix, Xray bump, nginx bump, base image change |
-
-Any change to image contents bumps at least PATCH — an nginx-only update is a
-new tag, never the same number on a different artifact. The components inside
-are recorded by `org.opencontainers.image.revision`, the job summary, and
+One release per date; a same-day respin takes the next date, and a published
+date is never re-pushed — the date names one artifact, never the kind of
+change. A protocol or data-format break is named by the protocol number and
+the release notes. The components inside are recorded by
+`org.opencontainers.image.revision`, the job summary, and
 `/usr/share/vela/components.txt`, not by the tag.
 
 ---

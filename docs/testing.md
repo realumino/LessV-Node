@@ -295,10 +295,13 @@ EOF
 
 Rules the sequence encodes:
 
-- **`v<version>` must equal `Cargo.toml`.** `meta` refuses a tag that disagrees,
-  is not strict SemVer, or carries build metadata (`+` cannot appear in an image
-  tag). A pre-release tag (`v0.7.2-rc.1`) publishes `<version>` and `sha-<short>`
-  and leaves `latest` alone.
+- **`v<version>` must equal `Cargo.toml`.** `meta` refuses a tag that
+  disagrees, is not strict SemVer, or carries build metadata (`+` cannot
+  appear in an image tag). The version is the release's UTC ship date,
+  `YY.M.D` with month and day unpadded — the SemVer grammar `meta` enforces
+  is exactly what an unpadded date satisfies. A pre-release tag
+  (`v26.11.20-rc.1`) publishes `<version>` and `sha-<short>` and leaves
+  `latest` alone.
 - **Tag first, release object second — never the reverse.** `--verify-tag` makes
   `gh release create` abort instead of creating a new tag at `main` HEAD, which
   would publish a different commit under a version that is already taken. A
@@ -309,7 +312,8 @@ Rules the sequence encodes:
   immutability there is. Never delete and re-push a tag whose image exists.
 - **A failed tag run published nothing**, because the push happens only after
   both architectures build. Recovery: `git push --delete origin "v$version"`,
-  `git tag -d "v$version"`, fix, bump at least PATCH, repeat from the top.
+  `git tag -d "v$version"`, fix, re-cut with the current UTC date — and with
+  the next date if today's has already published — repeat from the top.
 - **Check the index, not the tag.** `merge` asserts `linux/amd64` and
   `linux/arm64` are both in it; to see it yourself:
   `docker buildx imagetools inspect ghcr.io/realumino/vela-server:<version>`.

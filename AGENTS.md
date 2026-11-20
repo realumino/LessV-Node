@@ -49,10 +49,15 @@ Cross-repo rules:
   broken release.
 - A version bump on its own is a release, not a protocol change: it needs no
   plane-side commit, but the `v<version>` tag, the image's `<version>` tag, and
-  `Cargo.toml` must agree. The version is the image's, not only the crate's:
-  MAJOR is a protocol or data-format break, MINOR an additive capability, and
-  any change to image contents (an Xray or nginx bump, a base image change)
-  bumps at least PATCH, so two images never share one tag. The release sequence
+  `Cargo.toml` must agree. The version is the image's, not only the crate's,
+  and it is the UTC ship date (`YY.M.D`, month and day never zero-padded —
+  Cargo's semver rejects `26.03.05`, so the tag is the Cargo string with a
+  `v`), written in the same commit that ships the change. The date identifies
+  one artifact and never classifies the change: a protocol or data-format
+  break is named by `PROTOCOL_VERSION` and the release notes, and any change
+  to image contents (an Xray or nginx bump, a base image change) is a new
+  date. One release per date — a same-day respin takes the next date, and a
+  published date is never re-pushed. The release sequence
   — tag, watch, release object, in that order — is `docs/testing.md` →
   Releasing; the tag is the publish trigger and the release is its record.
 - Constants owned by the plane are mirrored in code here, never redefined: the
